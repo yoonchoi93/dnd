@@ -109,6 +109,19 @@ nav.tabs button.on{color:var(--gold2)}
 .ok-c{color:var(--green)} .bad-c{color:var(--red)}
 .banner{background:#2a2012;border:1px solid #6b5124;color:#f3dcae;border-radius:12px;padding:12px;font-size:14px;margin-bottom:14px}
 hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+.party{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.ally{display:flex;align-items:center;gap:8px;font-size:13px;background:#1b2420;border:1px solid #2e4238;border-radius:10px;padding:6px 10px;margin-bottom:6px}
+.ally .bar{flex:1;height:5px;background:#26332c;border-radius:3px;overflow:hidden}
+.ally .bar i{display:block;height:100%;background:var(--green)}
+.ally.down{opacity:.4}
+.camp{border-left:4px solid var(--gold)}
+.chap{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+.chap.lock{color:var(--muted)}
+.lvl{display:inline-block;background:var(--gold);color:#1a140c;font-weight:800;border-radius:6px;padding:0 6px;font-size:12px;margin-left:4px}
+.btn[disabled]{opacity:.35;filter:grayscale(.6)}
+.btn.sm{white-space:nowrap;flex-shrink:0}
+.tog{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:var(--surface2);border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.tog.on{border-color:var(--green)}
 </style>
 </head>
 <body>
@@ -129,46 +142,1217 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 <script>
 'use strict';
 /* ================= 기본 도구 ================= */
-const KEY='dnd-offline-v1';
+const KEY='dnd-offline-v2';
 const $=s=>document.querySelector(s);
 const rnd=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n+1;};
 const pick=a=>a[rnd(a.length)-1];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const mod=v=>Math.floor((v-10)/2);
 const sgn=n=>(n>=0?'+':'')+n;
+const fl=Math.floor;
 function parseDice(e){const m=String(e).replace(/\s/g,'').match(/^(\d*)d(\d+)([+-]\d+)?$/i);return m?{n:+(m[1]||1),s:+m[2],b:+(m[3]||0)}:null;}
 function roll(e,crit){const p=parseDice(e);const n=crit?p.n*2:p.n;const r=[];for(let i=0;i<n;i++)r.push(rnd(p.s));return{t:Math.max(0,r.reduce((a,b)=>a+b,0)+p.b),r,b:p.b};}
 function d20(mode){const a=rnd(20),b=rnd(20);if(mode==='adv')return{v:Math.max(a,b),txt:`[${a}, ${b}]`};if(mode==='dis')return{v:Math.min(a,b),txt:`[${a}, ${b}]`};return{v:a,txt:`${a}`};}
 
-/* ================= 규칙 데이터 ================= */
+/* ================= 규칙 ================= */
 const ABIL={str:'근력',dex:'민첩',con:'건강',int:'지능',wis:'지혜',cha:'매력'};
 const SKILL={'운동':'str','곡예':'dex','은신':'dex','손재주':'dex','조사':'int','비전':'int','역사':'int','종교':'int','통찰':'wis','지각':'wis','의학':'wis','생존':'wis','설득':'cha','기만':'cha','위협':'cha'};
+const PB=L=>L>=9?4:L>=5?3:2;
 const CLASSES={
- fighter:{name:'파이터',icon:'⚔️',diff:'쉬움',blurb:'두꺼운 갑옷과 롱소드. 가장 튼튼해서 처음 하기 좋아요.',
-  abil:{str:16,dex:13,con:15,int:10,wis:12,cha:8},hp:28,ac:18,slots:0,prof:['운동','위협','지각','생존'],
-  attacks:[{id:'sword',name:'롱소드 공격',type:'attack',atk:5,dmg:'1d8+3',desc:'명중 +5 · 1d8+3'}],
-  feats:[{id:'secondwind',name:'재기의 바람',desc:'추가 행동 · HP 1d10+3 회복 (휴식마다 1회)',max:1,type:'heal',heal:'1d10+3',free:true},
-         {id:'surge',name:'행동 연쇄',desc:'이번 턴 두 번 공격 (휴식마다 1회)',max:1,type:'multi',count:2}],
-  gear:['체인 메일','방패','롱소드','밧줄 15m','횃불 3개']},
- rogue:{name:'로그',icon:'🗡️',diff:'보통',blurb:'숨어서 급소를 노리는 기술자. 기술 판정에 아주 강해요.',
-  abil:{str:10,dex:16,con:14,int:12,wis:13,cha:12},hp:21,ac:14,slots:0,prof:['은신','손재주','기만','지각','조사','통찰','곡예'],
-  attacks:[{id:'rapier',name:'레이피어 공격',type:'attack',atk:5,dmg:'1d8+3',sneakR1:true,desc:'명중 +5 · 1d8+3 (첫 라운드엔 급소 공격 +2d6)'},
-           {id:'hide',name:'숨었다가 급소 찌르기',type:'hide',atk:5,dmg:'1d8+3',dc:12,desc:'은신 DC 12 성공 시 이점 + 급소 공격 2d6'}],
-  sneak:'2d6',feats:[],gear:['가죽 갑옷','레이피어','단검 2개','도둑 도구','갈고리 밧줄']},
- wizard:{name:'위저드',icon:'🔮',diff:'어려움',blurb:'강력한 주문을 쓰지만 몸이 약해요. 주문 슬롯 관리가 핵심.',
-  abil:{str:8,dex:14,con:14,int:16,wis:12,cha:10},hp:20,ac:15,slots:6,prof:['비전','조사','역사','통찰'],
-  attacks:[{id:'firebolt',name:'화염살',type:'attack',atk:5,dmg:'1d10',desc:'소마법 · 명중 +5 · 1d10'}],
-  feats:[{id:'missile',name:'마법 화살',desc:'슬롯 1 · 반드시 명중 3d4+3',slot:1,type:'auto',dmg:'3d4+3'},
-         {id:'thunder',name:'천둥파',desc:'슬롯 1 · 모든 적 2d8 (건강 내성 DC 13 성공 시 절반)',slot:1,type:'aoe',dmg:'2d8',dc:13}],
-  gear:['마법사 로브 (마법 갑옷 상시)','지팡이','주문서','촛대','잉크와 깃펜']},
- cleric:{name:'클레릭',icon:'✨',diff:'보통',blurb:'철퇴와 치유 주문. 튼튼하고 회복도 되는 균형형.',
-  abil:{str:14,dex:10,con:14,int:10,wis:16,cha:12},hp:24,ac:18,slots:5,prof:['통찰','설득','의학','종교'],
-  attacks:[{id:'mace',name:'철퇴 공격',type:'attack',atk:4,dmg:'1d6+2',desc:'명중 +4 · 1d6+2'},
-           {id:'flame',name:'성스러운 불꽃',type:'save',dc:13,dmg:'1d8',desc:'소마법 · 민첩 내성 DC 13 실패 시 1d8'}],
-  feats:[{id:'cure',name:'치유의 손길',desc:'슬롯 1 · HP 1d8+3 회복',slot:1,type:'heal',heal:'1d8+3'},
-         {id:'bolt',name:'인도하는 화살',desc:'슬롯 1 · 명중 +5 · 4d6',slot:1,type:'attack',atk:5,dmg:'4d6'}],
-  gear:['체인 메일','방패','철퇴','성표','향과 기도서']}
+ fighter:{name:'파이터',icon:'⚔️',diff:'쉬움',hp0:28,blurb:'두꺼운 갑옷과 롱소드. 가장 튼튼해서 처음 하기 좋아요.',abil:{str:16,dex:13,con:15,int:10,wis:12,cha:8},prof:['운동','위협','지각','생존'],gear:['체인 메일','방패','롱소드','밧줄 15m','횃불 3개']},
+ rogue:{name:'로그',icon:'🗡️',diff:'보통',hp0:21,blurb:'숨어서 급소를 노리는 기술자. 기술 판정에 아주 강해요.',abil:{str:10,dex:16,con:14,int:12,wis:13,cha:12},prof:['은신','손재주','기만','지각','조사','통찰','곡예'],gear:['가죽 갑옷','레이피어','단검 2개','도둑 도구','갈고리 밧줄']},
+ wizard:{name:'위저드',icon:'🔮',diff:'어려움',hp0:20,blurb:'강력한 주문을 쓰지만 몸이 약해요. 주문 슬롯 관리가 핵심.',abil:{str:8,dex:14,con:14,int:16,wis:12,cha:10},prof:['비전','조사','역사','통찰'],gear:['마법사 로브 (마법 갑옷 상시)','지팡이','주문서','잉크와 깃펜']},
+ cleric:{name:'클레릭',icon:'✨',diff:'보통',hp0:24,blurb:'철퇴와 치유 주문. 튼튼하고 회복도 되는 균형형.',abil:{str:14,dex:10,con:14,int:10,wis:16,cha:12},prof:['통찰','설득','의학','종교'],gear:['체인 메일','방패','철퇴','성표','기도서']}
 };
+/* 레벨별 능력 계산 */
+function kit(cls,L){const k=CLASSES[cls],p=PB(L),r={abil:k.abil,prof:k.prof,p,apa:1,attacks:[],feats:[],passive:[],sneak:null,dc:8+p+3};
+ if(cls==='fighter'){Object.assign(r,{maxhp:k.hp0+8*(L-3),ac:L>=8?19:18,maxSlots:0,apa:L>=11?3:L>=5?2:1});
+  r.attacks=[{id:'sword',name:'롱소드 공격',type:'attack',weapon:1,atk:p+3,dmg:'1d8+3',desc:`명중 ${sgn(p+3)} · 1d8+3${r.apa>1?` · ${r.apa}회 공격`:''}`}];
+  r.feats=[{id:'secondwind',name:'재기의 바람',desc:`추가 행동 · HP 1d10+${L} 회복 (휴식마다 1회)`,max:1,type:'heal',heal:`1d10+${L}`,free:true},
+   {id:'surge',name:'행동 연쇄',desc:'이번 턴 공격 횟수 두 배 (휴식마다 1회)',max:1,type:'multi'}];
+  if(L>=5)r.passive.push(['추가 공격','공격할 때 '+r.apa+'번 휘두릅니다.']);}
+ if(cls==='rogue'){const sn=Math.ceil(L/2);Object.assign(r,{maxhp:k.hp0+7*(L-3),ac:L>=6?15:14,maxSlots:0,sneak:`${sn}d6`});
+  r.attacks=[{id:'rapier',name:'레이피어 공격',type:'attack',weapon:1,atk:p+3,dmg:'1d8+3',sneakR1:true,desc:`명중 ${sgn(p+3)} · 1d8+3 (첫 라운드엔 급소 +${sn}d6)`},
+   {id:'hide',name:'숨었다가 급소 찌르기',type:'hide',weapon:1,atk:p+3,dmg:'1d8+3',dc:12,desc:`은신 DC 12 성공 시 이점 + 급소 ${sn}d6`}];
+  if(L>=5)r.passive.push(['불가사의한 회피','매 라운드 처음 맞는 공격의 피해가 절반이 됩니다.']);}
+ if(cls==='wizard'){Object.assign(r,{maxhp:k.hp0+5*(L-3),ac:15,maxSlots:L+3});
+  r.attacks=[{id:'firebolt',name:'화염살',type:'attack',atk:p+3,dmg:L>=11?'3d10':L>=5?'2d10':'1d10',desc:`소마법 · 명중 ${sgn(p+3)} · ${L>=11?'3d10':L>=5?'2d10':'1d10'}`}];
+  const mm=L>=9?'5d4+5':L>=5?'4d4+4':'3d4+3';
+  r.feats=[{id:'missile',name:'마법 화살',desc:`슬롯 1 · 반드시 명중 ${mm}`,slot:1,type:'auto',dmg:mm},
+   {id:'thunder',name:'천둥파',desc:`슬롯 1 · 모든 적 2d8 (내성 DC ${r.dc} 성공 시 절반)`,slot:1,type:'aoe',dmg:'2d8'}];
+  if(L>=5)r.feats.push({id:'fireball',name:'화염구',desc:`슬롯 2 · 모든 적 8d6 (내성 DC ${r.dc} 성공 시 절반)`,slot:2,type:'aoe',dmg:'8d6'});
+  if(L>=9)r.feats.push({id:'cone',name:'냉기 원뿔',desc:`슬롯 3 · 모든 적 8d8 (내성 성공 시 절반)`,slot:3,type:'aoe',dmg:'8d8'});}
+ if(cls==='cleric'){Object.assign(r,{maxhp:k.hp0+7*(L-3),ac:L>=8?19:18,maxSlots:L+2});
+  const sf=L>=11?'3d8':L>=5?'2d8':'1d8';
+  r.attacks=[{id:'mace',name:'철퇴 공격',type:'attack',weapon:1,atk:p+2,dmg:L>=8?'2d6+2':'1d6+2',desc:`명중 ${sgn(p+2)} · ${L>=8?'2d6+2 (신성한 일격)':'1d6+2'}`},
+   {id:'flame',name:'성스러운 불꽃',type:'save',dmg:sf,desc:`소마법 · 민첩 내성 DC ${r.dc} 실패 시 ${sf}`}];
+  const cw=L>=9?'3d8+4':L>=5?'2d8+3':'1d8+3';
+  r.feats=[{id:'cure',name:'치유의 손길',desc:`슬롯 1 · HP ${cw} 회복`,slot:1,type:'heal',heal:cw},
+   {id:'bolt',name:'인도하는 화살',desc:`슬롯 1 · 명중 ${sgn(p+3)} · ${L>=9?'5d6':'4d6'}`,slot:1,type:'attack',atk:p+3,dmg:L>=9?'5d6':'4d6'}];
+  if(L>=5)r.feats.push({id:'guard',name:'수호령',desc:`슬롯 2 · 모든 적 3d8 (내성 성공 시 절반)`,slot:2,type:'aoe',dmg:'3d8'});}
+ return r;}
+
+/* ================= 적·동료 생성 도우미 (스토리에서 사용) ================= */
+function mob(name,L,o){return Object.assign({name,hp:4+3*L,ac:12+fl(L/3),atk:3+fl(L/2),dmg:`1d6+${1+fl(L/2)}`,save:1+fl(L/3)},o||{});}
+function elite(name,L,o){return Object.assign({name,hp:10+5*L,ac:13+fl(L/3),atk:4+fl(L/2),dmg:`1d10+${2+fl(L/2)}`,save:2+fl(L/3)},o||{});}
+function boss(name,L,o){return Object.assign({name,hp:30+12*L,ac:14+fl(L/3),atk:5+fl(L/2),dmg:`2d8+${2+fl(L/2)}`,save:3+fl(L/3),attacks:L>=6?2:1},o||{});}
+function compStats(c,L){const R={
+  tank:{hp:12+7*L,ac:17,atk:4+fl(L/2),dmg:`1d10+${2+fl(L/3)}`},
+  striker:{hp:8+5*L,ac:15,atk:4+fl(L/2),dmg:`1d8+${3+fl(L/3)}`},
+  caster:{hp:6+4*L,ac:12,atk:4+fl(L/2),dmg:`2d6+${fl(L/2)}`},
+  healer:{hp:10+6*L,ac:16,atk:3+fl(L/2),dmg:`1d6+${2+fl(L/3)}`,heals:2,heal:`1d8+${2+fl(L/2)}`}}[c.role];
+ return Object.assign({name:c.name,role:c.role,max:R.hp},R);}
+const ROLE={tank:'탱커',striker:'공격수',caster:'마법사',healer:'치유사'};
+
+/* ================= 캠페인 등록 ================= */
+const CAMPS=[];const NODES={};
+function CAMP(c){CAMPS.push(c);Object.entries(c.nodes).forEach(([id,n])=>{n.camp=c.id;NODES[id]=n;});}
+const camp=id=>CAMPS.find(c=>c.id===id);
+
+/* ================= 상태 ================= */
+function fresh(){return{tab:'adv',hero:null,char:null,adv:null,saves:{},done:{},dice:{hist:[],count:1,mod:0,mode:'norm',last:null},chaos:5,like:2,journal:'',olast:null,draft:{cls:'fighter',name:''},menu:true};}
+let S;try{S=JSON.parse(localStorage.getItem(KEY))||null;}catch(e){S=null;}
+if(!S){S=fresh();try{const old=JSON.parse(localStorage.getItem('dnd-offline-v1'));if(old&&old.char){S.hero={cls:old.char.cls,name:old.char.name};S.journal=old.journal||'';}}catch(e){}}
+S=Object.assign(fresh(),S);
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+const K=()=>S.char?applyGear(kit(S.char.cls,S.char.level),inv(S.char)):null;
+const has=id=>!!(S.adv&&S.adv.roster.includes(id));
+function skillBonus(sk,c){c=c||S.char||(S.hero&&makeChar(S.hero.cls,S.hero.name,3));const k=kit(c.cls,c.level),m=gearMods(c);return mod(k.abil[SKILL[sk]])+(k.prof.includes(sk)?k.p:0)+(m.skills[sk]||0)+(m.skills.all||0);}
+function makeChar(cls,name,L){const k=kit(cls,L);const c={cls,name:name||CLASSES[cls].name,level:L,hp:k.maxhp,maxhp:k.maxhp,ac:k.ac,slots:k.maxSlots,maxSlots:k.maxSlots,uses:{},potions:3,gold:20,items:[...CLASSES[cls].gear],eq:{},bag:{}};k.feats.forEach(f=>{if(f.max)c.uses[f.id]=f.max;});return c;}
+function syncChar(full){const c=S.char,k=K();const gain=k.maxhp-c.maxhp;c.maxhp=k.maxhp;c.ac=k.ac;c.maxSlots=k.maxSlots;c.hp=full?c.maxhp:Math.min(c.maxhp,c.hp+Math.max(0,gain));if(full)c.slots=c.maxSlots;c.slots=Math.min(c.slots,c.maxSlots);k.feats.forEach(f=>{if(f.max&&(full||c.uses[f.id]===undefined))c.uses[f.id]=f.max;});}
+
+/* ================= 오버레이 ================= */
+function modal(html,btns){const o=$('#overlay');o.innerHTML=`<div class="card">${html}<div class="row" style="justify-content:center;margin-top:16px">${btns.map((b,i)=>`<button class="btn ${b.cls||''}" data-mb="${i}">${b.t}</button>`).join('')}</div></div>`;o.classList.add('show');o.onclick=e=>{const b=e.target.closest('[data-mb]');if(!b)return;o.classList.remove('show');o.onclick=null;btns[+b.dataset.mb].fn&&btns[+b.dataset.mb].fn();};}
+
+/* ================= 모험 진행 ================= */
+function fxApply(fx){const A=S.adv,c=S.char;const out=[];const cp=camp(A.camp);
+ if(fx.set)Object.assign(A.flags,fx.set);
+ if(fx.gold){const g=fx.gold<0?Math.max(fx.gold,-c.gold):fx.gold;if(g){c.gold+=g;out.push(`💰 금화 ${sgn(g)}`);}}
+ if(fx.potions){c.potions=Math.max(0,c.potions+fx.potions);out.push(`🧪 치유 물약 ${sgn(fx.potions)}`);}
+ if(fx.item&&!c.items.includes(fx.item)){c.items.push(fx.item);out.push(`🎒 '${fx.item}' 획득`);}
+ if(fx.lose){const i=c.items.indexOf(fx.lose);if(i>=0){c.items.splice(i,1);out.push(`🎒 '${fx.lose}' 잃음`);}}
+ if(fx.dmg){const r=roll(fx.dmg);c.hp=Math.max(0,c.hp-r.t);out.push(`💥 피해 ${r.t}`);}
+ if(fx.heal){const b=c.hp;c.hp=fx.heal==='full'?c.maxhp:Math.min(c.maxhp,c.hp+roll(fx.heal).t);out.push(`💚 HP +${c.hp-b}`);}
+ if(fx.leave)[].concat(fx.leave).forEach(id=>{if(A.roster.includes(id)){A.roster=A.roster.filter(x=>x!==id);A.party=A.party.filter(x=>x!==id);out.push(`👋 ${cp.comps[id].name}이(가) 일행을 떠났다`);}});
+ if(fx.join)[].concat(fx.join).forEach(id=>{if(!A.roster.includes(id)){A.roster.push(id);if(A.party.length<3){A.party.push(id);out.push(`🤝 ${cp.comps[id].name} 합류!`);}else out.push(`🤝 ${cp.comps[id].name} 합류! (파티가 꽉 차서 대기 중 · '동료 편성'에서 바꿀 수 있어요)`);}});
+ if(fx.loot)[].concat(fx.loot).forEach(id=>out.push(gainItem(id)));
+ if(fx.rest)out.push(doRest(false));
+ A.fx.push(...out);}
+function doRest(full){const c=S.char,k=K();const before=c.hp;
+ if(full){c.hp=c.maxhp;c.slots=c.maxSlots;}else{c.hp=Math.min(c.maxhp,c.hp+Math.ceil(c.maxhp/2));c.slots=Math.min(c.maxSlots,c.slots+Math.max(2,fl(c.maxSlots/3)));}
+ k.feats.forEach(f=>{if(f.max)c.uses[f.id]=f.max;});
+ return `😮‍💨 휴식: HP +${c.hp-before}${k.maxSlots?`, 주문 슬롯 ${c.slots}/${c.maxSlots}`:''}, 특수 능력 회복`;}
+function snapshot(){const A=S.adv;return JSON.parse(JSON.stringify({char:S.char,flags:A.flags,roster:A.roster,party:A.party}));}
+function stashCurrent(){if(S.adv)S.saves[S.adv.camp]={adv:S.adv,char:S.char};}
+function startCamp(id){stashCurrent();const cp=camp(id);
+ S.char=makeChar(S.hero.cls,S.hero.name,cp.startLevel);S.char.gold=cp.startGold||20;
+ S.adv={camp:id,chapter:0,node:null,flags:{},roster:[],party:[],fx:[],cp:null,combat:null,ended:null,chSnap:{}};
+ S.adv.chSnap[0]=snapshot();S.menu=false;enterNode(cp.chapters[0].start);}
+function resumeCamp(id){if(S.adv&&S.adv.camp===id){S.menu=false;save();render();return;}stashCurrent();const sv=S.saves[id];S.adv=sv.adv;S.char=sv.char;delete S.saves[id];S.menu=false;save();render();window.scrollTo(0,0);}
+function restartChapter(id,ch){if(!(S.adv&&S.adv.camp===id)){stashCurrent();const sv=S.saves[id];S.adv=sv.adv;S.char=sv.char;delete S.saves[id];}
+ const A=S.adv,sn=JSON.parse(JSON.stringify(A.chSnap[ch]));S.char=sn.char;A.flags=sn.flags;A.roster=sn.roster;A.party=sn.party;A.chapter=ch;
+ Object.keys(A.chSnap).forEach(k=>{if(+k>ch)delete A.chSnap[k];});S.menu=false;enterNode(camp(id).chapters[ch].start);}
+function nextChapter(){const A=S.adv,cp=camp(A.camp);const c=S.char;const L0=c.level;
+ c.level=Math.min(12,c.level+1);syncChar(true);A.chapter++;A.chSnap[A.chapter]=snapshot();
+ modal(`<div style="font-size:44px">⬆️</div><h2>레벨 업! ${L0} → ${c.level}</h2><p class="muted">HP가 ${c.maxhp}(으)로 늘고, 완전히 회복했어요.${levelNote(c.cls,c.level)}</p>`,[{t:'다음 장으로',fn:()=>enterNode(cp.chapters[A.chapter].start)}]);save();}
+function levelNote(cls,L){const n={fighter:{5:'추가 공격: 한 번에 두 번 휘둘러요!',8:'갑옷 강화: AC 19',11:'추가 공격 3회!'},rogue:{5:'불가사의한 회피: 매 라운드 첫 피해 절반!',6:'AC 15'},wizard:{5:'새 주문: 화염구! 화염살 강화',9:'새 주문: 냉기 원뿔! 마법 화살 강화'},cleric:{5:'새 주문: 수호령! 치유 강화',8:'신성한 일격: 철퇴 강화',9:'치유·인도하는 화살 강화'}}[cls][L];return n?`<br><b style="color:var(--gold2)">새 능력: ${n}</b>`:'';}
+function enterNode(id){const A=S.adv,n=NODES[id];A.node=id;A.combat=null;A.fx=[];A.ended=null;
+ A.cp=snapshot();
+ if(n.onEnter&&!A.flags['_v_'+id])fxApply(n.onEnter);
+ A.flags['_v_'+id]=1;
+ if(n.combat)A.combat=setupCombat(typeof n.combat==='function'?n.combat(A.flags):n.combat);
+ if(n.ending){A.ended=n.ending;S.done[A.camp]=true;}
+ if(S.char.hp<=0)tryRevive();
+ save();render();window.scrollTo(0,0);
+ if(S.char.hp<=0)death();}
+function reqOk(x){const f=S.adv.flags;if(x.startsWith('has:'))return has(x.slice(4));if(x.startsWith('party:'))return S.adv.party.includes(x.slice(6));if(x.startsWith('item:'))return S.char.items.includes(x.slice(5));if(x.startsWith('class:'))return S.char.cls===x.slice(6);return!!f[x];}
+function visible(n){return(n.choices||[]).map((c,i)=>({c,i})).filter(({c})=>(!c.req||c.req.every(reqOk))&&(!c.not||!c.not.some(reqOk)));}
+function dcOf(ch){return typeof ch.dc==='function'?ch.dc(S.adv.flags):ch.dc;}
+function choose(i){const A=S.adv,n=NODES[A.node],ch=n.choices[i];if(S.char.hp<=0)return death();
+ if(ch.gold<0&&S.char.gold<-ch.gold)return;
+ A.fx=[];const pre=Object.assign({},ch);delete pre.check;delete pre.go;
+ fxApply(pre);const keep=A.fx;
+ const go=to=>{enterNode(to);if(keep.length){A.fx=keep.concat(A.fx);save();render();}};
+ if(ch.check){const k=ch.check,dc=dcOf(k),b=skillBonus(k.skill),r=rnd(20),tot=r+b;
+  const ok=r===20||(r!==1&&tot>=dc);save();
+  modal(`<div class="scene-title">${ABIL[SKILL[k.skill]]}(${k.skill}) 판정 · DC ${dc}</div>
+   <div class="big">${tot}</div><div class="muted">🎲 ${r} ${sgn(b)}${r===20?' · 대성공!':r===1?' · 대실패!':''}</div>
+   <h2 class="${ok?'ok-c':'bad-c'}" style="margin-top:10px">${ok?'성공':'실패'}</h2>`,[{t:'계속',fn:()=>go(ok?k.ok:k.fail)}]);return;}
+ go(ch.go);}
+
+/* ---- 전투 ---- */
+function expandFoes(list){const out=[];list.forEach(e=>{const n=e.n||1;for(let i=0;i<n;i++){const o=Object.assign({},e);delete o.n;if(n>1)o.name=`${e.name} ${i+1}`;o.max=o.max||o.hp;out.push(o);}});return out;}
+function setupCombat(cfg){const A=S.adv,cp=camp(A.camp),L=S.char.level;
+ const allies=[];if(!cfg.noParty)A.party.forEach(id=>{const c=cp.comps[id];if(c)allies.push(compStats(c,L));});
+ (cfg.allies||[]).forEach(a=>allies.push(Object.assign({max:a.hp},a)));
+ const mul=cp.hpMul||1;const en=expandFoes(cfg.enemies).map(e=>Object.assign(e,{hp:Math.round(e.hp*mul),max:Math.round(e.max*mul)}));
+ return{enemies:en,allies,win:cfg.win,round:1,log:[],target:0,potion:false,free:false,done:false,dodged:false};}
+function alive(){return S.adv.combat.enemies.filter(e=>e.hp>0);}
+function tgt(){const cb=S.adv.combat;if(cb.enemies[cb.target]&&cb.enemies[cb.target].hp>0)return cb.enemies[cb.target];const a=alive()[0];cb.target=cb.enemies.indexOf(a);return a;}
+function L(s,c){S.adv.combat.log.unshift(`<div class="${c||''}">${s}</div>`);}
+function hitDmg(e,dmg,src){e.hp=Math.max(0,e.hp-dmg);L(`${src} → <b>${esc(e.name)}</b>에게 ${dmg} 피해${e.hp<=0?' · <b>쓰러짐!</b>':''}`,'hit');}
+function weaponAttack(a,opts){opts=opts||{};const e=tgt();if(!e)return;const cb=S.adv.combat,k=K();
+ const g=k.gear||{onhit:[]},bf=cb.buff||{atk:0,dmg:0};const atk=a.atk+(a.weapon?bf.atk:0);
+ const dr=d20(opts.adv?'adv':'norm');const crit=dr.v===20||(a.weapon&&g.crit19&&dr.v===19);const tot=dr.v+atk;
+ if(dr.v!==1&&(crit||tot>=e.ac)){let d=roll(a.dmg,crit).t+(a.weapon?bf.dmg:0),extra='';
+  if(a.weapon)g.onhit.forEach(o=>{const x=roll(o,crit).t;d+=x;extra+=` (+${x})`;});
+  if(k.sneak&&!cb.sneakUsed&&(opts.sneak||(a.sneakR1&&cb.round===1))){const s=roll(k.sneak,crit);d+=s.t;extra=` (급소 +${s.t})`;cb.sneakUsed=true;}
+  hitDmg(e,d,`${a.name} 🎲${dr.txt}${sgn(atk)}=${tot}${crit?' 치명타!':''}${extra}`);}
+ else L(`${a.name} 🎲${dr.txt}${sgn(atk)}=${tot} → ${esc(e.name)}(AC ${e.ac}) 빗나감`);}
+function act(kind,id){const cb=S.adv.combat,c=S.char,k=K();if(!cb||cb.done||c.hp<=0)return;
+ if(kind==='potion'){if(cb.potion||c.potions<1)return;c.potions--;cb.potion=true;const r=roll(`2d4+${2+fl(c.level/2)*2}`);const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+r.t);L(`🧪 치유 물약 → HP +${c.hp-b}`,'ok');save();render();return;}
+ const a=[...k.attacks,...k.feats].find(x=>x.id===id);if(!a)return;
+ if(a.free){if(cb.free||!c.uses[a.id])return;c.uses[a.id]--;cb.free=true;const r=roll(a.heal);const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+r.t);L(`${a.name} → HP +${c.hp-b}`,'ok');save();render();return;}
+ if(a.slot){if(c.slots<a.slot)return;c.slots-=a.slot;}
+ if(a.max){if(!c.uses[a.id])return;c.uses[a.id]--;}
+ cb.sneakUsed=false;
+ if(a.type==='attack'){const times=a.id===k.attacks[0].id&&c.cls==='fighter'?k.apa:1;for(let i=0;i<times;i++)if(alive().length)weaponAttack(a);}
+ else if(a.type==='hide'){const r=rnd(20),b=skillBonus('은신');if(r+b>=a.dc){L(`그림자 속으로 숨는다 (은신 ${r}${sgn(b)}=${r+b}) ✔`,'ok');weaponAttack(a,{adv:true,sneak:true});}else{L(`숨기 실패 (은신 ${r}${sgn(b)}=${r+b}) — 그냥 찌른다`);weaponAttack(a);}}
+ else if(a.type==='multi'){L(`<b>${a.name}!</b>`,'ok');for(let i=0;i<k.apa*2;i++)if(alive().length)weaponAttack(k.attacks[0]);}
+ else if(a.type==='auto'){const e=tgt();hitDmg(e,roll(a.dmg).t,`✨ ${a.name}`);}
+ else if(a.type==='aoe'){alive().forEach(e=>{const s=rnd(20)+e.save;let d=roll(a.dmg).t;if(s>=k.dc)d=fl(d/2);hitDmg(e,d,`💥 ${a.name}${s>=k.dc?' (내성, 절반)':''}`);});}
+ else if(a.type==='save'){const e=tgt();const s=rnd(20)+e.save;if(s>=k.dc)L(`${a.name} → ${esc(e.name)}이(가) 피함 (내성 ${s})`);else hitDmg(e,roll(a.dmg).t,`🔥 ${a.name}`);}
+ else if(a.type==='heal'){const r=roll(a.heal);const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+r.t);L(`${a.name} → HP +${c.hp-b}`,'ok');}
+ endTurn();}
+function endTurn(){const cb=S.adv.combat,c=S.char;
+ cb.allies.forEach(al=>{if(al.hp<=0||!alive().length)return;
+  if(al.role==='healer'&&al.heals>0&&c.hp<c.maxhp*0.45){al.heals--;const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+roll(al.heal).t);L(`💚 ${al.name}의 치유 → 당신 HP +${c.hp-b}`,'ok');return;}
+  const e=tgt();const r=rnd(20);if(r!==1&&(r===20||r+al.atk>=e.ac))hitDmg(e,roll(al.dmg,r===20).t,`🤝 ${al.name}`);else L(`🤝 ${al.name}의 공격이 빗나감`);});
+ if(!alive().length)return win();
+ cb.dodged=false;const dodge=c.cls==='rogue'&&c.level>=5;const gm=K().gear,bac=(cb.buff&&cb.buff.ac)||0;
+ alive().forEach(e=>{for(let i=0;i<(e.attacks||1);i++){if(c.hp<=0)return;
+  const pool=[{me:1},{me:1},...cb.allies.filter(a=>a.hp>0)];const t=pool[rnd(pool.length)-1];
+  const ac=t.me?c.ac+bac:t.ac;const r=rnd(20),tot=r+e.atk;
+  if(r!==1&&(r===20||tot>=ac)){let d=roll(e.dmg,r===20).t;
+   if(t.me){let note='';if(dodge&&!cb.dodged){cb.dodged=true;d=Math.ceil(d/2);note=' (회피로 절반)';}if(gm.resist){d=Math.max(1,d-gm.resist);}c.hp=Math.max(0,c.hp-d);if(c.hp<=0)tryRevive();L(`${esc(e.name)} 🎲${r}${sgn(e.atk)}=${tot}${r===20?' 치명타!':''} → 당신에게 ${d} 피해${note}`,'hurt');}
+   else{t.hp=Math.max(0,t.hp-d);L(`${esc(e.name)} → ${esc(t.name)}에게 ${d} 피해${t.hp<=0?' · 쓰러짐!':''}`,'hurt');}}
+  else L(`${esc(e.name)}의 공격 🎲${r}${sgn(e.atk)}=${tot} → ${t.me?'막아냈다':esc(t.name)+'이(가) 막아냄'}`);}});
+ if(gm.regen&&c.hp>0&&c.hp<c.maxhp){const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+gm.regen);L(`💚 재생 +${c.hp-b}`,'ok');}
+ cb.round++;cb.potion=false;cb.free=false;save();render();
+ if(c.hp<=0)death();}
+function win(){const cb=S.adv.combat,c=S.char;cb.done=true;const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+Math.ceil(c.maxhp/4));cb.loot=combatLoot(cb);L(`🏆 <b>승리!</b> 숨을 고른다 (HP +${c.hp-b})<br>${cb.loot.join('<br>')}`,'ok');save();render();}
+function death(){modal(`<div style="font-size:48px">💀</div><h2 class="bad-c">쓰러졌다…</h2><p class="muted">눈앞이 캄캄해진다. 하지만 이야기는 여기서 끝나지 않는다. 이 장면이 시작된 순간으로 돌아갈 수 있다.</p>`,
+ [{t:'이 장면 다시',fn:()=>{const A=S.adv,sn=A.cp;S.char=sn.char;A.flags=sn.flags;A.roster=sn.roster;A.party=sn.party;enterNode(A.node);}},{t:'이 장 처음부터',cls:'ghost',fn:()=>restartChapter(S.adv.camp,S.adv.chapter)}]);}
+function partyModal(){const A=S.adv,cp=camp(A.camp),L=S.char.level;
+ const body=()=>`<h2>동료 편성</h2><p class="muted">전투에 함께할 동료를 최대 3명 고르세요.</p>${A.roster.map(id=>{const c=cp.comps[id],st=compStats(c,L),on=A.party.includes(id);return`<button class="tog ${on?'on':''}" data-pt="${id}"><span><b>${esc(c.name)}</b> <span class="muted">${ROLE[c.role]} · HP ${st.hp}</span><br><small class="muted">${esc(c.desc||'')}</small></span><span>${on?'✅':'⬜'}</span></button>`;}).join('')}`;
+ modal(body(),[{t:'완료',fn:()=>{save();render();}}]);
+ $('#overlay').onclick=e=>{const t=e.target.closest('[data-pt]');if(t){const id=t.dataset.pt;if(A.party.includes(id))A.party=A.party.filter(x=>x!==id);else if(A.party.length<3)A.party.push(id);partyModal();return;}const b=e.target.closest('[data-mb]');if(b){$('#overlay').classList.remove('show');save();render();}};}
+
+/* ================= 아이템 ================= */
+const MARTIAL=['fighter','rogue','cleric'],HEAVY=['fighter','cleric'];
+const ITEMS={
+ /* 소모품 */
+ potion:{name:'치유 물약',type:'use',price:15,desc:'HP 회복 · 추가 행동 (전투 중 턴마다 1회)'},
+ gpotion:{name:'상급 치유 물약',type:'use',price:40,desc:'HP 4d4+4 (+레벨) 회복 · 추가 행동',use:{heal:'4d4+4'},free:true},
+ bomb:{name:'화염 폭탄',type:'use',price:35,desc:'모든 적에게 3d6 (+레벨) 화염 피해 · 행동',use:{aoe:'3d6'},combatOnly:true},
+ might:{name:'거인의 힘 물약',type:'use',price:30,desc:'이번 전투 동안 명중 +2, 무기 피해 +3 · 추가 행동',use:{buff:{atk:2,dmg:3}},free:true,combatOnly:true},
+ stone:{name:'석피 물약',type:'use',price:30,desc:'이번 전투 동안 AC +3 · 추가 행동',use:{buff:{ac:3}},free:true,combatOnly:true},
+ scroll:{name:'주문 회복 두루마리',type:'use',price:50,desc:'주문 슬롯 2개 회복 · 추가 행동',use:{slots:2},free:true,caster:true},
+ phoenix:{name:'불사조 깃털',type:'use',price:120,desc:'쓰러지는 순간 자동으로 HP 절반을 회복하며 일어남 (가방에 있으면 발동)',passive:true},
+ /* 무기 · 근접 */
+ w_plus1:{name:'+1 마법 무기',type:'weapon',tier:1,price:120,cls:MARTIAL,mods:{atk:1,dmg:1},desc:'무기 명중 +1 · 피해 +1'},
+ w_keen:{name:'예리한 단검',type:'weapon',tier:1,price:140,cls:['rogue','fighter'],mods:{atk:1,crit19:1},desc:'무기 명중 +1 · 19~20에 치명타'},
+ w_plus2:{name:'+2 마법 무기',type:'weapon',tier:2,price:350,cls:MARTIAL,mods:{atk:2,dmg:2},desc:'무기 명중 +2 · 피해 +2'},
+ w_flame:{name:'화염의 혀',type:'weapon',tier:2,price:450,cls:MARTIAL,mods:{atk:1,dmg:1,onhit:'2d6'},desc:'명중 +1 · 피해 +1 · 적중 시 화염 2d6'},
+ w_frost:{name:'서리 브랜드',type:'weapon',tier:3,price:750,cls:MARTIAL,mods:{atk:2,dmg:2,onhit:'1d10'},desc:'명중 +2 · 피해 +2 · 적중 시 냉기 1d10'},
+ w_plus3:{name:'+3 수호자의 검',type:'weapon',tier:3,price:900,cls:MARTIAL,mods:{atk:3,dmg:3,crit19:1,ac:1},desc:'명중 +3 · 피해 +3 · 19~20 치명타 · AC +1'},
+ /* 무기 · 주문 도구 */
+ f_wand:{name:'전쟁 마법사의 완드',type:'weapon',tier:1,price:120,cls:['wizard'],mods:{satk:1,dc:1},desc:'주문 명중 +1 · 주문 DC +1'},
+ f_staff:{name:'권능의 지팡이',type:'weapon',tier:2,price:400,cls:['wizard'],mods:{satk:2,dc:2,ac:1,maxhp:5},desc:'주문 명중 +2 · DC +2 · AC +1 · HP +5'},
+ f_archstaff:{name:'대마법사의 지팡이',type:'weapon',tier:3,price:850,cls:['wizard'],mods:{satk:3,dc:3,slots:2},desc:'주문 명중 +3 · DC +3 · 주문 슬롯 +2'},
+ h_symbol:{name:'축복받은 성표',type:'weapon',tier:1,price:120,cls:['cleric'],mods:{satk:1,dc:1,heal:2},desc:'주문 명중 +1 · DC +1 · 치유량 +2'},
+ h_reliq:{name:'빛의 성유물',type:'weapon',tier:2,price:400,cls:['cleric'],mods:{satk:2,dc:2,heal:4},desc:'주문 명중 +2 · DC +2 · 치유량 +4'},
+ h_sunsoul:{name:'태양혼의 성유물',type:'weapon',tier:3,price:850,cls:['cleric'],mods:{satk:3,dc:3,heal:6,regen:2},desc:'주문 명중 +3 · DC +3 · 치유 +6 · 매 라운드 HP 2'},
+ /* 갑옷 */
+ a_cloak:{name:'보호의 망토',type:'armor',tier:1,price:110,mods:{ac:1},desc:'AC +1'},
+ a_mithril:{name:'미스릴 셔츠',type:'armor',tier:2,price:380,cls:['fighter','rogue','cleric'],mods:{ac:2,skills:{'은신':1}},desc:'AC +2 · 은신 +1'},
+ a_robe:{name:'대마법사의 로브',type:'armor',tier:2,price:380,cls:['wizard'],mods:{ac:2,dc:1},desc:'AC +2 · 주문 DC +1'},
+ a_plate:{name:'+1 판금 갑옷',type:'armor',tier:2,price:420,cls:HEAVY,mods:{ac:2,resist:1},desc:'AC +2 · 받는 피해 -1'},
+ a_dragon:{name:'용비늘 갑옷',type:'armor',tier:3,price:900,cls:MARTIAL,mods:{ac:3,resist:2,maxhp:5},desc:'AC +3 · 받는 피해 -2 · HP +5'},
+ a_starcloak:{name:'별빛 망토',type:'armor',tier:3,price:800,cls:['wizard'],mods:{ac:3,dc:1,maxhp:8},desc:'AC +3 · 주문 DC +1 · HP +8'},
+ /* 장신구 */
+ t_ring:{name:'보호의 반지',type:'trinket',tier:1,price:100,mods:{ac:1},desc:'AC +1'},
+ t_amulet:{name:'건강의 부적',type:'trinket',tier:1,price:90,mods:{maxhp:8},desc:'최대 HP +8'},
+ t_luck:{name:'행운의 돌',type:'trinket',tier:1,price:90,mods:{skills:{all:1}},desc:'모든 기술 판정 +1'},
+ t_eye:{name:'통찰의 눈',type:'trinket',tier:1,price:80,mods:{skills:{'통찰':3,'지각':3}},desc:'통찰 +3 · 지각 +3'},
+ t_tongue:{name:'은빛 혀 브로치',type:'trinket',tier:1,price:80,mods:{skills:{'설득':3,'기만':2,'위협':2}},desc:'설득 +3 · 기만 +2 · 위협 +2'},
+ t_shadow:{name:'그림자 장갑',type:'trinket',tier:1,price:80,mods:{skills:{'은신':3,'손재주':3}},desc:'은신 +3 · 손재주 +3'},
+ t_ogre:{name:'오우거 힘의 건틀릿',type:'trinket',tier:2,price:300,cls:MARTIAL,mods:{dmg:2,skills:{'운동':3}},desc:'무기 피해 +2 · 운동 +3'},
+ t_regen:{name:'재생의 반지',type:'trinket',tier:2,price:350,mods:{regen:2},desc:'전투 중 매 라운드 HP 2 회복'},
+ t_ward:{name:'저항의 부적',type:'trinket',tier:2,price:300,mods:{resist:2},desc:'받는 피해 -2'},
+ t_focus:{name:'집중의 수정',type:'trinket',tier:2,price:320,cls:['wizard','cleric'],mods:{satk:1,dc:1,slots:1},desc:'주문 명중·DC +1 · 주문 슬롯 +1'},
+ t_haste:{name:'신속의 장화',type:'trinket',tier:3,price:700,mods:{atk:1,satk:1,ac:2},desc:'명중 +1 · AC +2'},
+ t_vital:{name:'생명의 보석',type:'trinket',tier:3,price:650,mods:{maxhp:20,regen:1},desc:'최대 HP +20 · 매 라운드 HP 1'},
+ /* 이야기 고유 아이템 (상점에 없음) */
+ u_gorion:{name:'고리온의 반지',type:'trinket',uniq:1,mods:{maxhp:6,dc:1,skills:{'역사':2,'비전':2}},desc:'고리온이 끼던 반지 · HP +6 · 주문 DC +1 · 역사·비전 +2'},
+ u_tazok:{name:'타조크의 대도끼',type:'weapon',uniq:1,cls:MARTIAL,mods:{atk:1,dmg:3},desc:'반오우거의 무식한 도끼 · 명중 +1 · 피해 +3'},
+ u_cyric:{name:'물라헤이의 검은 성표',type:'trinket',uniq:1,mods:{satk:1,atk:1,skills:{'위협':2}},desc:'사이릭의 문양 · 명중 +1 · 위협 +2'},
+ u_davaeorn:{name:'다바에오른의 반지',type:'trinket',uniq:1,mods:{dc:1,slots:1,ac:1},desc:'마법사의 반지 · DC +1 · 주문 슬롯 +1 · AC +1'},
+ u_acorn:{name:'드라이어드의 도토리',type:'trinket',uniq:1,mods:{regen:2,skills:{'생존':2}},desc:'숲의 생명력 · 매 라운드 HP 2 · 생존 +2'},
+ u_kalah:{name:'환술사의 망토',type:'armor',uniq:1,mods:{ac:2,skills:{'은신':2,'기만':2}},desc:'칼라의 망토 · AC +2 · 은신·기만 +2'},
+ u_hulk:{name:'엄버 헐크 갑각 방패',type:'armor',uniq:1,cls:MARTIAL,mods:{ac:3,resist:1},desc:'괴물 갑각으로 만든 방패 · AC +3 · 받는 피해 -1'},
+ u_bodhi:{name:'보디의 송곳니 단검',type:'weapon',uniq:1,cls:MARTIAL,mods:{atk:2,dmg:2,onhit:'1d8'},desc:'흡혈귀의 단검 · 명중 +2 · 피해 +2 · 적중 시 1d8'},
+ u_ellesime:{name:'엘레시메의 축복',type:'trinket',uniq:1,mods:{maxhp:10,regen:2},desc:'엘프 여왕의 축복 · HP +10 · 매 라운드 HP 2'},
+ u_zhalk:{name:'잘크의 불꽃 대검',type:'weapon',uniq:1,cls:MARTIAL,mods:{atk:1,onhit:'1d6'},desc:'캠비온의 검 · 명중 +1 · 적중 시 화염 1d6'},
+ u_hag:{name:'해그의 머리카락',type:'trinket',uniq:1,mods:{maxhp:5,skills:{all:1}},desc:'역겹지만 강력하다 · HP +5 · 모든 기술 +1'},
+ u_dror:{name:'드로르의 왕관',type:'trinket',uniq:1,mods:{atk:1,satk:1,skills:{'위협':3}},desc:'고블린 두목의 투박한 왕관 · 명중 +1 · 위협 +3'},
+ u_aylin:{name:'셀루네의 은빛 깃털',type:'trinket',uniq:1,mods:{regen:3,ac:1},desc:'아일린의 깃털 · 매 라운드 HP 3 · AC +1'}
+};
+const SLOTN={weapon:'무기',armor:'갑옷',t1:'장신구 1',t2:'장신구 2'};
+const TYPEN={weapon:'무기',armor:'갑옷',trinket:'장신구',use:'소모품'};
+const isGear=id=>ITEMS[id]&&ITEMS[id].type!=='use';
+function inv(c){c=c||S.char;if(c){c.eq=c.eq||{};c.bag=c.bag||{};}return c;}
+function canUse(id,c){const it=ITEMS[id];c=c||S.char;return!it.cls||it.cls.includes(c.cls);}
+function owned(id,c){c=inv(c||S.char);return(c.bag[id]||0)>0||Object.values(c.eq).includes(id);}
+function gearMods(c){const m={atk:0,dmg:0,satk:0,ac:0,maxhp:0,dc:0,regen:0,resist:0,heal:0,slots:0,onhit:[],crit19:false,skills:{}};
+ Object.values((c&&c.eq)||{}).forEach(id=>{const it=ITEMS[id];if(!it||!it.mods)return;const o=it.mods;
+  ['atk','dmg','satk','ac','maxhp','dc','regen','resist','heal','slots'].forEach(k=>{if(o[k])m[k]+=o[k];});
+  if(o.onhit)m.onhit.push(o.onhit);if(o.crit19)m.crit19=true;
+  if(o.skills)Object.entries(o.skills).forEach(([s,v])=>m.skills[s]=(m.skills[s]||0)+v);});
+ return m;}
+function addFlat(d,n){if(!n)return d;const p=parseDice(d);const b=p.b+n;return`${p.n}d${p.s}${b?sgn(b):''}`;}
+function applyGear(k,c){const m=gearMods(c);k=Object.assign({},k,{gear:m});
+ k.maxhp+=m.maxhp;k.ac+=m.ac;if(k.maxSlots)k.maxSlots+=m.slots;k.dc+=m.dc;
+ const note=(a,b)=>a||b?` · 장비 ${[a?'명중'+sgn(a):'',b?'피해'+sgn(b):''].filter(Boolean).join(' ')}`:'';
+ const mapA=a=>{if(a.type!=='attack'&&a.type!=='hide'&&a.type!=='heal')return a;a=Object.assign({},a);
+  if(a.type==='heal'){if(m.heal){a.heal=addFlat(a.heal,m.heal);a.desc+=` · 장비 치유+${m.heal}`;}return a;}
+  if(a.weapon){a.atk+=m.atk;a.dmg=addFlat(a.dmg,m.dmg);a.desc+=note(m.atk,m.dmg)+(m.onhit.length?` · 추가 ${m.onhit.join('+')}`:'');}
+  else if(m.satk){a.atk+=m.satk;a.desc+=note(m.satk,0);}
+  return a;};
+ k.attacks=k.attacks.map(mapA);k.feats=k.feats.map(mapA);return k;}
+function addBag(id,n,c){c=inv(c||S.char);c.bag[id]=(c.bag[id]||0)+(n||1);}
+function slotFor(id,c){const t=ITEMS[id].type;if(t==='weapon'||t==='armor')return t;c=inv(c);return!c.eq.t1?'t1':!c.eq.t2?'t2':'t2';}
+function equip(id){const c=inv(S.char);if(!canUse(id)||!c.bag[id])return;const sl=slotFor(id,c);
+ if(c.eq[sl])addBag(c.eq[sl]);c.eq[sl]=id;c.bag[id]--;if(!c.bag[id])delete c.bag[id];syncChar(false);}
+function unequip(sl){const c=inv(S.char);if(!c.eq[sl])return;addBag(c.eq[sl]);delete c.eq[sl];syncChar(false);}
+/* 획득: 빈 칸이면 자동 장착 */
+function gainItem(id){const c=inv(S.char),it=ITEMS[id];if(!it)return'';
+ if(id==='potion'){c.potions++;return`🧪 '${it.name}' 획득`;}
+ addBag(id);
+ if(isGear(id)&&canUse(id)){const sl=it.type==='trinket'?(!c.eq.t1?'t1':!c.eq.t2?'t2':null):(!c.eq[it.type]?it.type:null);
+  if(sl){c.bag[id]--;if(!c.bag[id])delete c.bag[id];c.eq[sl]=id;syncChar(false);return`🎁 '${it.name}' 획득 · 자동 장착!`;}}
+ return`🎁 '${it.name}' 획득${isGear(id)?(canUse(id)?' · 가방에서 장착할 수 있어요':' · 내 직업은 못 써요 (팔 수 있어요)'):''}`;}
+function tierFor(L){return L<=5?1:L<=8?2:3;}
+function randomGear(L){const c=S.char,t=tierFor(L);const pool=Object.keys(ITEMS).filter(id=>{const it=ITEMS[id];return isGear(id)&&!it.uniq&&it.tier===t&&canUse(id)&&!owned(id);});return pool.length?pick(pool):null;}
+function combatLoot(cb){const c=S.char,cp=camp(S.adv.camp),out=[];
+ let g=0;cb.enemies.forEach(e=>g+=rnd(Math.max(2,Math.round(e.max/5))));g=Math.max(1,Math.round(g*(cp.goldMul||1)));c.gold+=g;out.push(`💰 금화 +${g}`);
+ if(rnd(100)<=30){const pool=['gpotion','bomb','might','stone'];if(c.maxSlots)pool.push('scroll');out.push(gainItem(pick(pool)));}
+ const big=cb.enemies.some(e=>e.max>=60);if(big&&rnd(100)<=60){const id=randomGear(c.level);if(id)out.push(gainItem(id));}
+ return out;}
+/* 사용 */
+function useItem(id,inCombat){const c=inv(S.char),it=ITEMS[id],cb=S.adv&&S.adv.combat;if(!it||!c.bag[id]||!it.use)return;const u=it.use;let msg='';
+ if(u.heal){const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+roll(u.heal).t+c.level);msg=`${it.name} → HP +${c.hp-b}`;}
+ if(u.slots){const b=c.slots;c.slots=Math.min(c.maxSlots,c.slots+u.slots);msg=`${it.name} → 주문 슬롯 +${c.slots-b}`;}
+ if(u.buff){cb.buff=cb.buff||{atk:0,dmg:0,ac:0};Object.entries(u.buff).forEach(([k,v])=>cb.buff[k]+=v);msg=`${it.name} → ${u.buff.ac?'AC +'+u.buff.ac:'명중 +'+u.buff.atk+', 피해 +'+u.buff.dmg} (이번 전투)`;}
+ c.bag[id]--;if(!c.bag[id])delete c.bag[id];
+ if(u.aoe){L(`💣 ${it.name}!`,'ok');alive().forEach(e=>hitDmg(e,roll(u.aoe).t+c.level,'🔥 폭발'));save();endTurn();return;}
+ if(inCombat){L(msg,'ok');if(it.free)cb.potion=true;save();render();}else{save();render();modal(`<p>${msg}</p>`,[{t:'확인'}]);}}
+function tryRevive(){const c=inv(S.char);if(c.hp>0||!c.bag.phoenix)return false;c.bag.phoenix--;if(!c.bag.phoenix)delete c.bag.phoenix;c.hp=Math.ceil(c.maxhp/2);
+ if(S.adv&&S.adv.combat)L('🔥 <b>불사조 깃털이 타오르며 당신을 일으킨다!</b>','ok');else if(S.adv)S.adv.fx.push('🔥 불사조 깃털이 당신을 일으켰다!');return true;}
+/* 가방 화면 */
+function bagModal(mode){const c=inv(S.char),inC=mode==='combat';const cb=S.adv&&S.adv.combat;
+ const row=(id,n)=>{const it=ITEMS[id];let btn='';
+  if(it.type==='use'){const ok=it.use&&!(it.combatOnly&&!inC)&&!(it.caster&&!c.maxSlots)&&!(inC&&it.free&&cb.potion);btn=it.use?`<button class="btn sm" data-bu="${id}" ${ok?'':'disabled'}>사용</button>`:'<span class="chip">자동</span>';}
+  else if(!inC)btn=canUse(id)?`<button class="btn sm" data-be="${id}">장착</button>`:'<span class="chip">직업 불가</span>';
+  return`<li style="text-align:left"><span><b>${esc(it.name)}</b>${n>1?` ×${n}`:''} <span class="muted" style="font-size:12px">${TYPEN[it.type]}</span><br><small class="muted">${esc(it.desc)}</small></span>${btn}</li>`;};
+ const items=Object.entries(c.bag).filter(([id,n])=>n>0&&ITEMS[id]&&(!inC||ITEMS[id].type==='use'));
+ const eq=inC?'':`<h3 style="text-align:left">장착 중</h3><ul class="list">${Object.keys(SLOTN).map(sl=>{const id=c.eq[sl];return`<li style="text-align:left"><span><span class="muted" style="font-size:12px">${SLOTN[sl]}</span><br>${id?`<b>${esc(ITEMS[id].name)}</b><br><small class="muted">${esc(ITEMS[id].desc)}</small>`:'<span class="muted">비어 있음</span>'}</span>${id?`<button class="btn ghost sm" data-bx="${sl}">해제</button>`:''}</li>`;}).join('')}</ul>`;
+ modal(`<h2>🎒 가방</h2><div style="max-height:60vh;overflow:auto">${eq}<h3 style="text-align:left;margin-top:12px">${inC?'전투에서 쓸 수 있는 아이템':'가방'}</h3><ul class="list">${items.map(([id,n])=>row(id,n)).join('')||'<li class="muted">비어 있어요</li>'}</ul></div>`,[{t:'닫기'}]);
+ $('#overlay').onclick=e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  if(d.bu){$('#overlay').classList.remove('show');useItem(d.bu,inC);return;}
+  if(d.be){equip(d.be);save();render();bagModal(mode);return;}
+  if(d.bx){unequip(d.bx);save();render();bagModal(mode);return;}
+  if(d.mb!==undefined){$('#overlay').classList.remove('show');save();render();}};}
+/* 상점 */
+const SHOPS={
+ f_tavern:{name:'마르다의 잡동사니',stock:['potion','gpotion','bomb','stone','t_eye','t_shadow','a_cloak']},
+ b1_early:{name:'윈스롭의 상점',stock:['potion','gpotion','bomb','might','stone','scroll','t_eye','t_tongue','t_shadow','a_cloak','t_amulet']},
+ b1_nashkel:{name:'나시켈 축제 장터',stock:['potion','gpotion','bomb','might','stone','scroll','phoenix','w_plus1','w_keen','f_wand','h_symbol','a_cloak','t_ring','t_amulet','t_luck']},
+ b1_city:{name:'발더스 게이트 상층 상점가',stock:['potion','gpotion','bomb','might','stone','scroll','phoenix','w_plus2','w_flame','f_staff','h_reliq','a_mithril','a_robe','a_plate','t_ogre','t_regen','t_ward','t_focus']},
+ b2_market:{name:'와우킨 광장 시장',stock:['potion','gpotion','bomb','might','stone','scroll','phoenix','w_plus2','w_flame','f_staff','h_reliq','a_mithril','a_robe','a_plate','t_ogre','t_regen','t_ward','t_focus','t_luck']},
+ b2_elf:{name:'엘프 장인의 노점',stock:['gpotion','bomb','scroll','phoenix','w_frost','w_plus3','f_archstaff','h_sunsoul','a_dragon','a_starcloak','t_haste','t_vital']},
+ b3_grove:{name:'티플링 행상인',stock:['potion','gpotion','bomb','might','stone','scroll','w_plus1','w_keen','f_wand','h_symbol','a_cloak','t_ring','t_amulet','t_luck','t_eye','t_tongue','t_shadow']},
+ b3_harper:{name:'하퍼 보급관',stock:['potion','gpotion','bomb','might','stone','scroll','phoenix','w_plus2','w_flame','f_staff','h_reliq','a_mithril','a_robe','a_plate','t_ogre','t_regen','t_ward','t_focus']},
+ b3_city:{name:'발더스 게이트 대시장',stock:['gpotion','bomb','might','stone','scroll','phoenix','w_frost','w_plus3','f_archstaff','h_sunsoul','a_dragon','a_starcloak','t_haste','t_vital','t_ogre','t_regen']}
+};
+function priceOf(id){return ITEMS[id].price||0;}
+function vShop(key){const sh=SHOPS[key],c=inv(S.char);
+ const buy=sh.stock.map(id=>{const it=ITEMS[id],p=priceOf(id),own=isGear(id)&&owned(id),no=!canUse(id);
+  return`<li><span><b>${esc(it.name)}</b> <span class="muted" style="font-size:12px">${TYPEN[it.type]}</span><br><small class="muted">${esc(it.desc)}</small></span><span style="text-align:right;white-space:nowrap"><span class="chip">💰 ${p}</span><br><button class="btn sm" style="margin-top:4px" data-buy="${id}" ${c.gold<p||own||no?'disabled':''}>${own?'보유':no?'직업 불가':'구매'}</button></span></li>`;}).join('');
+ const sellable=Object.entries(c.bag).filter(([id,n])=>n>0&&ITEMS[id]);
+ const sell=sellable.map(([id,n])=>`<li><span>${esc(ITEMS[id].name)}${n>1?` ×${n}`:''}</span><button class="btn ghost sm" data-sell="${id}">💰 ${fl(priceOf(id)/2)}에 팔기</button></li>`).join('');
+ return`<div class="card"><div class="scene-title">🛒 ${esc(sh.name)}</div><div class="row" style="justify-content:space-between"><span>내 금화</span><b style="color:var(--gold2)">💰 ${c.gold}</b></div><ul class="list" style="margin-top:6px">${buy}</ul>
+  ${sell?`<h3 style="margin-top:14px">팔기 <span class="muted" style="font-size:12px">(반값 · 장착한 것은 해제 후 팔 수 있어요)</span></h3><ul class="list">${sell}</ul>`:''}</div>`;}
+function buy(id){const c=inv(S.char),p=priceOf(id);if(c.gold<p)return;c.gold-=p;const m=gainItem(id);save();render();modal(`<p>${m}</p>`,[{t:'확인'}]);}
+function sell(id){const c=inv(S.char);if(!c.bag[id])return;c.bag[id]--;if(!c.bag[id])delete c.bag[id];c.gold+=fl(priceOf(id)/2);save();render();}
+
+/* ===== 발더스 게이트 1: 바알의 후예 (게임 줄거리를 바탕으로 새로 쓴 축약판 + 오리지널 외전 장면) ===== */
+CAMP({id:'bg1',title:'발더스 게이트 1: 바알의 후예',short:'BG1 바알의 후예',sub:'게임 1편 줄거리 · 4장',
+ desc:'성채 도서관 캔들킵에서 자란 당신. 양아버지 고리온이 쓰러진 밤, 소드 코스트를 뒤흔드는 철의 위기와 당신 핏속의 비밀이 깨어난다.',
+ startLevel:3,startGold:30,
+ comps:{
+  imoen:{name:'이모엔',role:'striker',desc:'캔들킵에서 함께 자란 장난꾸러기 도둑. 단검과 활.'},
+  jaheira:{name:'자헤이라',role:'healer',desc:'날카로운 하프엘프 드루이드. 하퍼 요원.'},
+  khalid:{name:'칼리드',role:'tank',desc:'자헤이라의 남편. 말을 더듬지만 검은 확실하다.'},
+  minsc:{name:'민스크',role:'tank',desc:'라쉬멘의 거구 레인저. 우주 햄스터 "부"와 함께.'},
+  dynaheir:{name:'다이나헤어',role:'caster',desc:'라쉬멘의 마녀. 침착한 화염 마법사.'}
+ },
+ chapters:[{title:'캔들킵의 밤',start:'b1_start'},{title:'나시켈의 피 묻은 철',start:'b1_c2'},{title:'도적 소굴과 클록우드',start:'b1_c3'},{title:'바알의 아들',start:'b1_c4'}],
+ nodes:{
+/* ---------- 1장: 캔들킵의 밤 (Lv3) ---------- */
+b1_start:{title:'캔들킵',text:`바다를 내려다보는 절벽 위, 지식의 성채 캔들킵. 당신은 이곳 서가 사이에서 자랐다. 양아버지 고리온은 이 성채에서 가장 존경받는 마법사다.
+
+그런데 오늘 고리온의 얼굴이 낯설다. 그는 당신을 서재로 불러 낮게 말한다.
+
+<i>"짐을 꾸려라. 오늘 밤 이곳을 떠난다. 이유는… 길 위에서 말해주마. 지금은 묻지 말고, 서둘러라."</i>
+
+창밖의 해가 기운다. 떠나기 전에 할 수 있는 일이 몇 가지 있다.`,
+ choices:[{t:'친구 이모엔을 찾아간다',not:['imoen_talk'],go:'b1_imoen'},
+  {t:'윈스롭의 여관 겸 상점에 들른다',not:['shop'],go:'b1_shop'},
+  {t:'도서관 꼭대기, 오래된 예언서를 찾아본다',not:['library'],set:{library:1},check:{skill:'역사',dc:12,ok:'b1_prophecy',fail:'b1_library_fail'}},
+  {t:'고리온에게 간다. 떠날 시간이다',go:'b1_depart'}]},
+b1_imoen:{title:'캔들킵 안뜰',onEnter:{set:{imoen_talk:1}},text:`분홍 머리 이모엔이 지붕 위에서 사과를 베어 물다 당신을 보고 뛰어내린다.
+
+"들었어! 아니, 엿들었다고 하는 게 맞겠다. 너 떠난다며? 나한테 한마디도 없이?" 그녀가 볼을 부풀린다. "고리온 아저씨가 안 된대도 난 따라갈 거야. 두고 봐."
+
+당신이 뭐라 하기도 전에 그녀는 다시 지붕 위로 사라진다.`,choices:[{t:'안뜰로 돌아간다',go:'b1_start'}]},
+b1_shop:{title:'윈스롭의 여관',shop:'b1_early',onEnter:{set:{shop:1},potions:1},text:`늙은 윈스롭이 카운터 너머로 당신을 오래 바라본다.
+
+"떠난다고? 그래, 언젠간 그럴 줄 알았지." 그가 먼지 쌓인 선반에서 붉은 병 하나를 꺼내 내민다. "<b>치유 물약</b>이다. 돈은 됐어. 네가 꼬맹이일 때 훔쳐 먹은 꿀과자 값이라 치자."
+
+"다른 것도 필요하면 골라 봐. 길 위에선 뭐든 쓸모가 있을 거다."`,
+ choices:[{t:'고맙다고 인사하고 나간다',go:'b1_start'}]},
+b1_prophecy:{title:'예언의 서고',onEnter:{set:{prophecy:1}},text:`먼지 낀 두루마리 사이에서 위대한 예언자 알라운도의 구절을 찾아낸다. 몇몇 줄에는 누군가 최근에 손가락으로 짚은 자국이 있다.
+
+<i>살인의 군주가 쓰러질 때, 그는 자신의 피를 대지에 흩뿌리리라. 그 씨앗들은 자라나 혼돈을 거두리라.</i>
+
+등줄기가 서늘해진다. 고리온은 왜 이 구절을 몇 번이고 읽었을까?`,choices:[{t:'서고를 나선다',go:'b1_start'}]},
+b1_library_fail:{title:'예언의 서고',text:`수천 권의 책 사이에서 무엇을 찾아야 할지조차 모르겠다. 사서 하나가 촛불을 끄며 나가라고 손짓한다.`,choices:[{t:'서고를 나선다',go:'b1_start'}]},
+b1_depart:{title:'캔들킵 정문',text:`해가 지고, 고리온과 함께 성문을 나선다. 그는 아무 말 없이 걷기만 한다. 등 뒤로 캔들킵의 불빛이 멀어진다.
+
+한 시간쯤 걸었을까. 숲길에 들어서자 고리온이 걸음을 멈춘다.
+
+"조용히. …우리 말고 누가 있다."
+
+어둠 속에서 거대한 그림자가 걸어 나온다. 뿔 달린 투구에 시커먼 판금 갑옷을 두른 거인. 그 뒤로 용병 넷과 오우거 하나가 따라온다.
+
+<i>"늙은이. 그 아이를 넘겨라. 그러면 너는 살려주지."</i>`,
+ choices:[{t:'고리온 곁에 남아 함께 싸운다',go:'b1_stand'},{t:'고리온의 외침대로 달아난다',go:'b1_flee'}]},
+b1_stand:{title:'숲길의 밤',text:`"어리석은 녀석! 달아나라고 했는데…!" 고리온이 마법 화살을 쏘아 거인을 밀어낸다. "그럼 저 용병들이라도 막아라!"
+
+용병 둘이 칼을 뽑고 당신에게 달려든다.`,combat:{enemies:[mob('용병',3,{hp:12,n:2})],win:'b1_gorion_falls'}},
+b1_gorion_falls:{title:'숲길의 밤',onEnter:{set:{stood:1}},text:`용병들이 쓰러진 순간, 고리온의 비명이 숲을 찢는다.
+
+돌아보니 거인의 검이 고리온의 가슴을 꿰뚫고 있다. 고리온은 마지막 힘으로 당신을 향해 손을 뻗는다. 입모양만이 보인다. <i>달아나라.</i>
+
+거인이 당신 쪽으로 투구를 돌린다. 그 순간 고리온의 몸에서 마지막 마법이 터져 나와 숲 전체를 눈부신 빛으로 덮는다. 당신은 정신없이 달린다.`,choices:[{t:'어둠 속으로…',go:'b1_dawn'}]},
+b1_flee:{title:'숲길의 밤',text:`"가라! 뒤돌아보지 마라!"
+
+당신은 덤불을 헤치고 달린다. 등 뒤에서 마법이 터지는 섬광, 강철이 부딪히는 소리, 그리고… 고리온의 비명. 그리고 정적.
+
+나뭇가지에 얼굴을 긁히며 한참을 달리다 쓰러진다.`,choices:[{t:'정신을 잃는다…',go:'b1_dawn'}]},
+b1_dawn:{title:'새벽',onEnter:{join:'imoen',item:'고리온의 편지',loot:'u_gorion'},text:`누군가 당신을 흔든다. 이모엔이다. 진흙투성이 얼굴로 숨을 몰아쉬고 있다.
+
+"내가 따라온다고 했잖아. 다 봤어… 고리온 아저씨는…" 그녀가 말을 잇지 못한다.
+
+둘은 숲길로 돌아가 고리온의 몸을 찾는다. 그의 품에서 봉인된 편지가 나온다. 당신에게 쓴 것이다.
+
+<i>"…만약 내게 무슨 일이 생기면, 북쪽 '우정의 팔 여관'으로 가거라. 내 오랜 벗 자헤이라와 칼리드가 너를 도울 것이다. 네가 누구인지는… 그들이 아니라 시간이 알려줄 것이다."</i>`,
+ choices:[{t:'고리온을 묻어주고 기도한다',not:['buried'],set:{buried:1},go:'b1_bury'},{t:'북쪽 길로 떠난다',go:'b1_road'}]},
+b1_bury:{title:'새벽',onEnter:{heal:'1d6+2'},text:`이모엔과 함께 맨손으로 흙을 판다. 해가 떠오를 무렵, 작은 돌무덤 위에 고리온의 지팡이를 꽂는다.
+
+"아저씨는 너를 지키려고 그런 거야." 이모엔이 당신 어깨에 기댄다. 슬픔 속에서도 이상하게 힘이 난다.`,choices:[{t:'북쪽 길로 떠난다',go:'b1_road'}]},
+b1_road:{title:'북쪽 길',text:`해안을 따라 난 길을 걷는다. 정오쯤, 언덕 너머로 검은 연기가 피어오르는 게 보인다. 농가 쪽이다. 희미하게 비명도 들린다.`,
+ choices:[{t:'농가로 달려간다',go:'b1_farm'},{t:'갈 길이 급하다. 여관으로 곧장 간다',go:'b1_inn'}]},
+b1_farm:{title:'불타는 농가',text:`헛간이 불타고 있다. 하이에나 머리를 한 놀 약탈자들이 가축을 끌어내며 낄낄거린다. 집 안에는 농부 가족이 갇혀 있다.
+
+"저 녀석들, 아직 우릴 못 봤어." 이모엔이 속삭인다.`,
+ choices:[{t:'몰래 다가가 기습한다',check:{skill:'은신',dc:12,ok:'b1_farm_ambush',fail:'b1_farm_fight'}},{t:'소리쳐 주의를 끈다',go:'b1_farm_fight'}]},
+b1_farm_ambush:{title:'불타는 농가',text:`그림자를 따라 다가가 첫 놈의 등을 덮친다! 놈들이 허둥대며 무기를 집어 든다.`,combat:{enemies:[mob('놀 약탈자',3,{hp:9}),mob('놀 약탈자',3)],win:'b1_farm_win'}},
+b1_farm_fight:{title:'불타는 농가',text:`놀들이 일제히 고개를 돌린다. "고기다! 신선한 고기!" 컹컹 짖으며 달려든다.`,combat:{enemies:[mob('놀 약탈자',3,{n:3})],win:'b1_farm_win'}},
+b1_farm_win:{title:'불타는 농가',onEnter:{gold:20,potions:1,set:{farm:1}},text:`농부 가족이 울면서 고마워한다. 농부가 숨겨둔 금화와 물약을 억지로 쥐여준다.
+
+"요즘 세상이 미쳤어요. 쇠가 썩어서 쟁기날이 부러지고, 대장간 칼도 휘어진다더군요. 남쪽 <b>나시켈 광산</b>에서 나오는 철이 이상하대요. 그래서 다들 굶주리고, 굶주린 놈들이 약탈을 하고…"
+
+철이 썩는다? 마음 한구석에 걸린다.`,choices:[{t:'여관으로 향한다',go:'b1_inn'}]},
+b1_inn:{title:'우정의 팔 여관',text:`언덕 위 성벽으로 둘러싸인 여관. 계단을 오르는데, 붉은 로브를 입은 남자가 반갑게 다가온다.
+
+"아, 고리온의 피후견인! 드디어 만났군. 자네를 기다리고 있었네." 그의 손이 소매 속으로 들어간다.`,
+ choices:[{t:'그의 손과 눈을 주시한다',check:{skill:'통찰',dc:12,ok:'b1_tarnesh_spot',fail:'b1_tarnesh_hit'}},{t:'"누구시죠?" 하고 다가간다',go:'b1_tarnesh_hit'}]},
+b1_tarnesh_spot:{title:'우정의 팔 여관',text:`소매 속에서 주문 구성요소가 반짝이는 걸 놓치지 않는다. 그가 주문을 외기 전에 당신이 먼저 덤벼든다!`,combat:{enemies:[elite('현상금 사냥꾼 마법사',3,{hp:20,ac:12})],win:'b1_tarnesh_win'}},
+b1_tarnesh_hit:{title:'우정의 팔 여관',onEnter:{dmg:'2d4+2'},text:`그의 손끝에서 마법 화살이 터져 나와 가슴에 꽂힌다! "미안하네, 자네 목에 걸린 금화가 꽤 두둑해서 말이야."`,combat:{enemies:[elite('현상금 사냥꾼 마법사',3,{ac:12})],win:'b1_tarnesh_win'}},
+b1_tarnesh_win:{title:'우정의 팔 여관',onEnter:{set:{bounty:1},item:'현상금 쪽지'},text:`쓰러진 마법사의 품에서 구겨진 쪽지가 나온다.
+
+<i>"고리온의 피후견인. 캔들킵 출신. 죽여서 가져오면 금화 200닢."</i>
+
+서명 대신 한 글자만 적혀 있다. <b>'S'</b>.
+
+누군가 당신을 죽이려고 돈을 걸었다. 왜?`,choices:[{t:'여관 안으로 들어간다',go:'b1_jaheira'}]},
+b1_jaheira:{title:'우정의 팔 여관',onEnter:{join:['jaheira','khalid']},text:`구석 테이블의 하프엘프 둘이 당신을 알아본다. 날카로운 눈매의 여자와 사람 좋아 보이는 남자.
+
+"고리온의… 아이로군." 여자가 일어선다. "자헤이라다. 이쪽은 내 남편 칼리드. 고리온이 오지 않은 걸 보니… 그렇게 된 건가."
+
+칼리드가 당신 손을 꼭 잡는다. "그, 그는 좋은 사람이었어. 이제 우리가 너, 너를 지킬게."
+
+자헤이라가 지도를 펼친다. "애도는 나중이다. 고리온은 우리에게 한 가지 일을 맡겼었지. 남쪽 나시켈 광산에서 철이 오염되고 있다. 소드 코스트 전체가 무너지기 직전이야. 그 배후에 너를 노리는 자들과 같은 이가 있을지도 모른다."`,
+ choices:[{t:'하퍼에 대해 묻는다',not:['harper'],set:{harper:1},go:'b1_harper'},{t:'여관에서 하룻밤 묵는다',sub:'금화 5 · 휴식',not:['inn_rest'],set:{inn_rest:1},gold:-5,rest:1,go:'b1_jaheira'},{t:'나시켈로 가자',go:'b1_c1_end'}]},
+b1_harper:{title:'우정의 팔 여관',text:`"하퍼." 자헤이라가 목소리를 낮춘다. "폭정을 막고 균형을 지키는 비밀 결사다. 고리온도 한때 우리 중 하나였지."
+
+칼리드가 덧붙인다. "고, 고리온은 너를 아주 특별하게 여겼어. 이유는 말해주지 않았지만."`,choices:[{t:'고개를 끄덕인다',go:'b1_jaheira'}]},
+b1_c1_end:{title:'1장 끝',chapterEnd:true,text:`다음 날 새벽, 넷이 된 일행은 남쪽으로 향한다.
+
+고리온을 죽인 판금 갑옷의 거인. 당신 목에 걸린 현상금. 썩어가는 철. 아직은 아무것도 이어지지 않는다.
+
+하지만 이모엔이 걸음을 맞추며 속삭인다. "있잖아, 무섭긴 한데… 솔직히 조금 신나기도 해."`}
+,
+/* ---------- 2장: 나시켈의 피 묻은 철 (Lv4) ---------- */
+b1_c2:{title:'남쪽 길',text:`나시켈로 가는 길목, 다리 위를 덩치 셋이 막아선다. 팔에는 녹슨 쇠사슬을 감았다.
+
+"통행세다. 1인당 금화 다섯 닢. 철값이 오르니 우리도 먹고 살아야지."`,
+ choices:[{t:'금화 20닢을 던져준다',gold:-20,go:'b1_nashkel'},{t:'"비켜라. 다치기 싫으면."',check:{skill:'위협',dc:13,ok:'b1_bridge_scare',fail:'b1_bridge_fight'}},{t:'무기를 뽑는다',go:'b1_bridge_fight'}]},
+b1_bridge_scare:{title:'남쪽 길',text:`당신의 눈빛에 덩치들이 주춤하더니, 침을 뱉고 길을 비킨다. "흥, 오늘은 운 좋은 줄 알아."`,choices:[{t:'나시켈로',go:'b1_nashkel'}]},
+b1_bridge_fight:{title:'남쪽 길',text:`"좋아, 그럼 몸으로 내라!" 도적들이 몽둥이를 휘두르며 달려든다.`,combat:{enemies:[mob('통행세 도적',4,{n:3})],win:'b1_bridge_win'}},
+b1_bridge_win:{title:'남쪽 길',onEnter:{gold:15},text:`도적들의 주머니에서 금화와 함께 이상한 화살촉이 나온다. 쇠가 아니라 거친 돌을 깎아 만든 것이다. 철이 그만큼 귀해졌다는 뜻이다.`,choices:[{t:'나시켈로',go:'b1_nashkel'}]},
+b1_nashkel:{title:'나시켈 마을',text:f=>`광산 마을 나시켈은 활기를 잃었다. 광부들은 술집에 모여 앉아 웅성거린다. 광산 깊은 곳에서 동료들이 하나둘 사라지고, 악마를 봤다는 소문까지 돈다.
+
+${f.minsc_met?'':'여관 앞에서 거구의 남자가 하늘을 향해 울부짖고 있다. "부! 우리가 늦었어! 마녀님이 놀들에게 붙잡혔단 말이다!" 그의 어깨 위에서 작은 햄스터가 찍찍댄다.'}`,
+ choices:[{t:'울부짖는 거구에게 말을 건다',not:['minsc_met'],go:'b1_minsc'},
+  {t:'다이나헤어를 구하러 놀 요새로 간다',req:['minsc_met'],not:['dyna'],go:'b1_gnoll'},
+  {t:'촌장 베룬을 찾아간다',not:['mayor'],go:'b1_mayor'},
+  {t:'마을 축제 천막을 둘러본다',not:['carnival'],go:'b1_carnival'},
+  {t:'광산으로 간다',req:['mayor'],go:'b1_mine'}]},
+b1_minsc:{title:'나시켈 마을',onEnter:{set:{minsc_met:1},join:'minsc'},text:`"나는 민스크! 그리고 이쪽은 부. 부는 우주에서 온 소형 거대 햄스터다!" 그가 당신 손을 부서져라 흔든다.
+
+"나는 라쉬멘의 마녀 다이나헤어님의 호위다. 그런데 놀들이 그분을 납치해 서쪽 절벽 요새에 가둬버렸다! 부가 그러는데, 너는 정의로운 냄새가 난다고 한다. 함께 가자!"
+
+칼리드가 웃음을 참으며 속삭인다. "가, 강한 건 확실해 보이네."`,choices:[{t:'"좋아, 함께 가자."',go:'b1_nashkel'}]},
+b1_gnoll:{title:'놀 요새',text:`서쪽 절벽 위, 뼈와 가죽으로 엮은 놀들의 요새. 정문에는 파수꾼이 셋, 절벽 쪽은 경비가 허술해 보인다.
+
+민스크가 이를 간다. "부가 말한다. 정문을 부숴버리자고!"`,
+ choices:[{t:'절벽을 타고 몰래 오른다',check:{skill:'운동',dc:13,ok:'b1_gnoll_in',fail:'b1_gnoll_gate'}},{t:'민스크와 함께 정문을 부순다',go:'b1_gnoll_gate'}]},
+b1_gnoll_in:{title:'놀 요새',text:`절벽을 오르니 바로 족장의 천막 뒤편이다. 안에서 사슬에 묶인 마녀가 보인다. 족장이 눈치채고 울부짖는다!`,combat:{enemies:[elite('놀 족장',4),mob('놀 호위',4)],win:'b1_dyna'}},
+b1_gnoll_gate:{title:'놀 요새',text:`"부! 공격이다!!" 민스크가 정문을 걷어차 부순다. 놀 떼가 사방에서 쏟아져 나온다!`,combat:{enemies:[elite('놀 족장',4),mob('놀 전사',4,{n:2})],win:'b1_dyna'}},
+b1_dyna:{title:'놀 요새',onEnter:{join:'dynaheir',set:{dyna:1},gold:30},text:`사슬을 끊자 검은 머리의 마녀가 위엄 있게 일어선다.
+
+"늦었구나, 민스크." 그녀는 엄격하게 말하지만 입가엔 미소가 있다. 민스크가 엉엉 운다. "부도 걱정했습니다, 마녀님!"
+
+다이나헤어가 당신을 오래 바라본다. "너에게서… 이상한 기운이 느껴지는구나. 이 은혜는 잊지 않으마."`,choices:[{t:'나시켈로 돌아간다',go:'b1_nashkel'}]},
+b1_mayor:{title:'촌장의 집',onEnter:{set:{mayor:1}},text:`촌장 베룬이 지친 얼굴로 맞는다.
+
+"광산 아래층에서 광부가 열둘이나 사라졌소. 살아 나온 자들은 코볼드 떼와 '푸른 불꽃을 부리는 악마'를 봤다더군. 더 큰 문제는 철이오. 캐낸 철광석이 제련만 하면 썩은 나무처럼 부서져버려요."
+
+그가 금화 자루를 흔든다. "광산의 진상을 밝혀주면 사례하겠소."`,choices:[{t:'광산으로 간다',go:'b1_mine'},{t:'마을을 더 둘러본다',go:'b1_nashkel'}]},
+b1_carnival:{title:'나시켈 축제',shop:'b1_nashkel',onEnter:{set:{carnival:1}},text:`우울한 마을을 달래려 열린 작은 축제. 천막 사이로 점쟁이 노파가 손짓한다.
+
+노파는 당신 손바닥을 보자마자 얼굴이 하얗게 질린다. "피… 아주 오래된 신의 피가 흐르는구나. 그 신은 죽었지만, 자식들은 살아 있어. 그리고 자식들끼리… 서로를 사냥하지."
+
+노파가 서둘러 천막을 닫는다. 옆으로는 떠돌이 상인들의 노점이 줄지어 있다. 광산에 가기 전에 장비를 갖추기 좋겠다.`,
+ choices:[{t:'마을로 돌아간다',go:'b1_nashkel'}]},
+b1_market:{title:'상층 도시 상점가',shop:'b1_city',text:`대리석 기둥 사이로 고급 상점들이 늘어서 있다. 현상수배 전단의 얼굴과 당신을 번갈아 보던 상인이 어깨를 으쓱한다. "금화만 있으면 누구든 손님이지."`,
+ choices:[{t:'상점가를 나선다',go:'b1_c4'}]},
+b1_mine:{title:'나시켈 광산',text:`광산 입구의 감독관 에머슨이 횃불을 건넨다. "아래 4층부터는 아무도 안 내려갑니다. 행운을 빌어요."
+
+갱도는 아래로, 더 아래로 이어진다. 3층쯤 내려가자 바닥에 가는 실이 반짝인다.`,
+ choices:[{t:'실을 살핀다',check:{skill:'지각',dc:13,ok:'b1_mine_trap_ok',fail:'b1_mine_trap'}},{t:'그냥 넘어간다',go:'b1_mine_trap'}]},
+b1_mine_trap_ok:{title:'광산 3층',text:`철사 함정이다. 천장의 바위 더미와 연결돼 있다. 조심스럽게 끊어낸다.
+
+이모엔이 휘파람을 분다. "코볼드 솜씨치곤 꽤 정교한데?"`,choices:[{t:'더 깊이 내려간다',go:'b1_kobolds'}]},
+b1_mine_trap:{title:'광산 3층',onEnter:{dmg:'2d6'},text:`발목에 뭔가 걸리는 순간, 천장에서 돌덩이가 쏟아진다! 간신히 피했지만 어깨가 욱신거린다.`,choices:[{t:'더 깊이 내려간다',go:'b1_kobolds'}]},
+b1_kobolds:{title:'광산 4층',text:`좁은 갱도가 넓은 동굴로 열린다. 그리고 수십 개의 붉은 눈. 코볼드들이 활을 겨누고 있다.
+
+"인간이다! 주인님께 바쳐라!"`,combat:{enemies:[mob('코볼드 특공대',4,{hp:10,n:3}),mob('코볼드 궁수',4,{hp:8,ac:12})],win:'b1_deep'}},
+b1_deep:{title:'광산 깊은 곳',text:`코볼드 시체 사이에서 광부들의 곡괭이와 헬멧이 발견된다. 갱도 벽에는 푸른 광택이 도는 이상한 가루가 발라져 있다. 철광석을 오염시키는 무언가다.
+
+자헤이라가 가루를 문질러본다. "자연의 것이 아니야. 누군가 일부러 철을 썩게 만들고 있다."`,
+ choices:[{t:'잠시 숨을 돌린다',sub:'짧은 휴식 · 한 번만',not:['r2'],set:{r2:1},rest:1,go:'b1_deep'},{t:'푸른 불빛이 새어 나오는 동굴로 간다',go:'b1_mulahey'}]},
+b1_mulahey:{title:'광산 최하층',text:`푸른 불꽃이 일렁이는 동굴. 해골 문양 로브를 입은 하프오크가 제단 앞에 서 있다. 사이릭의 사제, 물라헤이다.
+
+당신을 본 그가 양손을 번쩍 든다. "자, 잠깐! 항복하겠다! 나는 그저 시키는 대로 했을 뿐이야! 다 말해주지!"`,
+ choices:[{t:'항복을 받아들이되 눈을 떼지 않는다',check:{skill:'통찰',dc:13,ok:'b1_mula_spot',fail:'b1_mula_trick'}},{t:'"말은 무덤에서 하라"며 공격한다',go:'b1_mula_fight'}]},
+b1_mula_spot:{title:'광산 최하층',text:`그의 손가락이 미세하게 꼬이는 걸 본다. 주문이다! "거짓말쟁이!" 당신이 먼저 내리친다.`,combat:{enemies:[boss('물라헤이',4,{hp:45,attacks:1}),mob('해골 병사',4,{hp:10})],win:'b1_mula_win'}},
+b1_mula_trick:{title:'광산 최하층',onEnter:{dmg:'2d6+2'},text:`당신이 다가가는 순간, 그가 낄낄대며 손을 비튼다. 검은 번개가 가슴을 때린다! "멍청하긴! 일어나라, 나의 종들이여!"
+
+바닥에서 해골들이 기어 나온다.`,combat:{enemies:[boss('물라헤이',4,{hp:55,attacks:1}),mob('해골 병사',4,{hp:10,n:2})],win:'b1_mula_win'}},
+b1_mula_fight:{title:'광산 최하층',text:`"좋다, 그럼 죽어라!" 물라헤이의 외침에 바닥에서 해골들이 기어 나온다.`,combat:{enemies:[boss('물라헤이',4,{hp:55,attacks:1}),mob('해골 병사',4,{hp:10,n:2})],win:'b1_mula_win'}},
+b1_mula_win:{title:'광산 최하층',onEnter:{gold:100,item:'물라헤이의 편지',loot:'u_cyric'},text:`물라헤이가 쓰러지자 푸른 불꽃이 꺼진다. 제단 아래에서 편지 꾸러미가 나온다.
+
+<i>"광석 오염을 계속하라. 철값이 오를수록 우리 주인의 계획은 가까워진다. 고리온의 피후견인이 나타나면 죽여라. — 타조크"</i>
+
+또 다른 편지에는 숲속 <b>도적 소굴</b>의 위치가 그려져 있다.
+
+자헤이라가 이를 악문다. "철을 썩히고, 도적을 풀어 상인을 털고… 누군가 소드 코스트를 일부러 굶기고 있어. 그리고 너를 노리는 것도 같은 놈들이다."`,
+ choices:[{t:'나시켈로 돌아가 보고한다',go:'b1_c2_end'}]},
+b1_c2_end:{title:'2장 끝',chapterEnd:true,text:`광산이 다시 열리고, 나시켈에 오랜만에 웃음이 돈다. 촌장 베룬은 당신의 이름을 외치며 술잔을 든다.
+
+하지만 당신 일행은 축배 대신 지도를 펼친다. 타조크라는 이름, 숲속 도적 소굴. 그리고 그 위에 있는 '주인'.
+
+민스크가 부를 어깨에 올린다. "부가 말한다. 악당의 소굴은 부수라고 있는 거라고!"`}
+,
+/* ---------- 3장: 도적 소굴과 클록우드 (Lv5) ---------- */
+b1_c3:{title:'도적 소굴',text:`숲 깊은 곳, 목책으로 둘러싸인 거대한 도적 야영지. 모닥불 사이로 수십 명이 오간다. 새 단원을 뽑는다는 공고가 정문에 붙어 있다.`,
+ choices:[{t:'신입 단원인 척 들어간다',check:{skill:'기만',dc:13,ok:'b1_recruit',fail:'b1_camp_fight'}},{t:'밤을 틈타 두목의 천막으로 숨어든다',check:{skill:'은신',dc:14,ok:'b1_tent_sneak',fail:'b1_camp_fight'}},{t:'정면으로 쳐들어간다',go:'b1_camp_fight'}]},
+b1_recruit:{title:'도적 소굴',text:`"신입이라고? 좋아, 실력부터 보자." 털보 부두목이 히죽 웃으며 결투장으로 끌고 간다. 도적들이 둘러서서 환호한다.`,
+ choices:[{t:'맨손 씨름으로 이긴다',check:{skill:'운동',dc:13,ok:'b1_recruit_win',fail:'b1_recruit_duel'}},{t:'무기로 겨룬다',go:'b1_recruit_duel'}]},
+b1_recruit_duel:{title:'결투장',text:`부두목이 도끼를 빙글 돌린다. "죽지만 마라, 신입!"`,combat:{noParty:true,enemies:[elite('도적 부두목',5,{hp:30})],win:'b1_recruit_win'}},
+b1_recruit_win:{title:'도적 소굴',text:`도적들이 환호성을 지른다. "괜찮은 놈이 왔네!" 부두목이 어깨를 툭 친다. "두목 타조크님이 보자신다. 천막으로 가 봐."`,choices:[{t:'두목의 천막으로',go:'b1_tent'}]},
+b1_camp_fight:{title:'도적 소굴',text:`"침입자다!" 종이 울리고 도적들이 몰려나온다.`,combat:{enemies:[mob('도적',5,{n:3}),mob('도적 궁수',5,{hp:15})],win:'b1_tent'}},
+b1_tent:{title:'타조크의 천막',text:`천막 안, 어깨가 문틀만 한 반오우거 타조크가 지도 위에 단검을 꽂고 있다. 그가 당신을 보고 이빨을 드러낸다.
+
+"고리온의 꼬맹이로군. 네 목에 걸린 돈이 얼마인지 아나? 주인님이 아주 좋아하시겠어."`,combat:{enemies:[boss('타조크',5,{hp:70}),mob('천막 호위',5)],win:'b1_docs'}},
+b1_tent_sneak:{title:'타조크의 천막',text:`코 고는 소리가 천막을 울린다. 거대한 반오우거 타조크가 잠들어 있다. 책상 위에 서류 상자가 놓여 있다.`,
+ choices:[{t:'서류 상자를 소리 없이 연다',check:{skill:'손재주',dc:13,ok:'b1_docs',fail:'b1_tent_wake'}},{t:'잠든 타조크를 덮친다',go:'b1_tent_wake'}]},
+b1_tent_wake:{title:'타조크의 천막',text:`타조크의 눈이 번쩍 뜨인다! "쥐새끼가 들어왔군!" 그가 거대한 도끼를 집어 든다.`,combat:{enemies:[boss('타조크',5,{hp:60})],win:'b1_docs'}},
+b1_docs:{title:'타조크의 천막',onEnter:{set:{docs:1},item:'철의 왕좌 문서',gold:60,loot:'u_tazok'},text:`서류 상자 속 편지들이 퍼즐 조각처럼 맞춰진다.
+
+도적단, 광산 오염, 상인 습격. 모두 <b>'철의 왕좌'</b>라는 상인 조합의 명령이다. 그리고 그들은 클록우드 숲 깊은 곳에 비밀 광산을 운영하며 철을 몰래 쌓아두고 있다.
+
+마지막 편지에는 처음 보는 이름이 서명돼 있다. <b>사레복</b>.
+
+<i>"고리온의 피후견인은 반드시 내 손으로. 다른 놈들은 손대지 마라."</i>
+
+칼리드가 중얼거린다. "고, 고리온을 죽인 그 거인… 혹시…"`,
+ choices:[{t:'클록우드 숲으로 간다',go:'b1_cloak'}]},
+b1_cloak:{title:'클록우드 숲',text:`빛조차 잘 들지 않는 고목의 숲. 나뭇가지에 굵은 거미줄이 늘어져 있다.
+
+덤불 속에서 상처 입은 엘프 드루이드가 기어 나온다. "도와주시오… 거미 괴물 에터캡들이 내 숲을 갉아먹고 있소. 놈들의 둥지를 없애주면 광산으로 가는 지름길을 알려주겠소."
+
+자헤이라가 당신을 본다. "숲의 균형이 깨지고 있다. 나는 돕고 싶군."`,
+ choices:[{t:'드루이드를 돕는다',go:'b1_spiders'},{t:'갈 길이 급하다. 광산으로 곧장 간다',go:'b1_cloak_road'}]},
+b1_spiders:{title:'거미 둥지',text:`둥지 한가운데, 거미와 사람을 반쯤 섞은 듯한 에터캡이 실을 뽑고 있다. 그 주위로 개만 한 거미들이 기어 다닌다.`,combat:{enemies:[elite('에터캡',5),mob('거대 거미',5,{hp:14,n:2})],win:'b1_spiders_win'}},
+b1_spiders_win:{title:'클록우드 숲',onEnter:{set:{druid:1},potions:2},text:`드루이드가 감사의 표시로 약초 물약 두 병을 건넨다.
+
+"광산 뒤편 계곡에 낡은 배수로가 있소. 그곳으로 들어가면 경비를 피할 수 있을 거요. 그리고… 광산 꼭대기의 수문을 조심하시오. 열리면 광산 전체가 물에 잠길 테니."`,choices:[{t:'배수로로 광산에 숨어든다',go:'b1_mine_in'}]},
+b1_cloak_road:{title:'클록우드 광산 입구',text:`광산 입구를 철의 왕좌 용병들이 지키고 있다. 그 너머로 사슬에 묶인 노예들이 광석을 나르는 모습이 보인다.`,
+ choices:[{t:'철의 왕좌 문서를 내밀며 감찰관 행세를 한다',req:['docs'],check:{skill:'기만',dc:12,ok:'b1_mine_in',fail:'b1_gate_fight'}},{t:'경비를 쓰러뜨린다',go:'b1_gate_fight'}]},
+b1_gate_fight:{title:'클록우드 광산 입구',text:`"침입자다! 노예들을 지하로 몰아넣어!" 용병들이 달려든다.`,combat:{enemies:[mob('철의 왕좌 용병',5,{n:3})],win:'b1_mine_in'}},
+b1_mine_in:{title:'클록우드 광산',text:`광산 안은 지옥이다. 앙상한 노예들이 채찍질 아래 광석을 캔다. 노예 우두머리인 늙은 드워프 릴이 몰래 다가온다.
+
+"당신들, 감독관 패거리가 아니군. 맨 아래층에 다바에오른이라는 마법사가 있소. 놈만 쓰러뜨리면 우리가 들고일어나겠소."`,
+ choices:[{t:'노예들에게 함께 싸우자고 설득한다',not:['riot_try'],set:{riot_try:1},check:{skill:'설득',dc:13,ok:'b1_riot',fail:'b1_mine_in2'}},
+  {t:'몰래 숨어 숨을 돌린다',sub:'짧은 휴식 · 한 번만',not:['r3'],set:{r3:1},rest:1,go:'b1_mine_in'},
+  {t:'맨 아래층으로 내려간다',go:'b1_davaeorn'}]},
+b1_riot:{title:'클록우드 광산',onEnter:{set:{riot:1}},text:`릴이 낡은 곡괭이를 치켜든다. "들었나, 형제들! 오늘이다!"
+
+노예들이 하나둘 사슬을 끊고 일어선다. 그들이 감독관들을 맡는 사이, 당신은 최하층으로 향한다.`,choices:[{t:'맨 아래층으로',go:'b1_davaeorn'}]},
+b1_mine_in2:{title:'클록우드 광산',text:`노예들은 겁에 질려 고개를 젓는다. "희망 따위로 사슬이 끊어지진 않소…"`,choices:[{t:'맨 아래층으로 내려간다',go:'b1_davaeorn'}]},
+b1_davaeorn:{title:'광산 최하층',text:f=>`최하층의 서재. 창백한 마법사 다바에오른이 책을 덮으며 일어선다.
+
+"사레복 님이 경고하셨지. 고리온의 아이가 쥐새끼처럼 기어들어 올 거라고." 그의 등 뒤에서 텅 빈 갑옷이 일어난다. 영혼 없는 전투 공포다.${f.riot?'\n\n위층에서 노예들의 함성이 들려온다. 감독관들은 이리로 오지 못할 것이다.':''}`,
+ combat:{enemies:[boss('다바에오른',5,{hp:60,ac:13,attacks:1}),elite('전투 공포',5,{hp:30})],win:'b1_flood'}},
+b1_flood:{title:'광산 최하층',onEnter:{item:'다바에오른의 일지',loot:'u_davaeorn'},text:`다바에오른이 재가 되어 흩어진다. 그의 책상 위 일지에 모든 계획이 적혀 있다. 철을 독점해 소드 코스트를 굶기고, 이웃 나라 앰과의 전쟁을 일으킨다. 그리고 그 혼란 속에서 발더스 게이트를 손에 넣는다. 계획의 주인은 사레복이다.
+
+벽에 커다란 수문 레버가 있다. 이걸 당기면 광산은 물에 잠기고, 철의 왕좌의 비밀 광산은 끝장난다.`,
+ choices:[{t:'노예들에게 탈출하라고 외치고 레버를 당긴다',check:{skill:'곡예',dc:12,ok:'b1_flood_ok',fail:'b1_flood_hurt'}}]},
+b1_flood_ok:{title:'수몰',text:`굉음과 함께 물이 쏟아져 들어온다. 노예들과 함께 갱도를 달려 올라간다. 마지막 사람이 빠져나오는 순간, 입구가 물보라에 잠긴다.`,choices:[{t:'숲으로 나온다',go:'b1_c3_end'}]},
+b1_flood_hurt:{title:'수몰',onEnter:{dmg:'2d6'},text:`물살에 휩쓸려 바위에 부딪힌다! 민스크가 당신의 멱살을 잡아 끌어올린다. "부가 말한다. 수영은 다음에 배우라고!"`,choices:[{t:'숲으로 나온다',go:'b1_c3_end'}]},
+b1_c3_end:{title:'3장 끝',chapterEnd:true,text:`해방된 노예들이 당신의 이름을 부르며 흩어진다. 비밀 광산이 사라지자 철값이 내려가기 시작한다.
+
+다바에오른의 일지는 한 곳을 가리킨다. <b>발더스 게이트</b>, 철의 왕좌 본부.
+
+그리고 일지 마지막 장에는 이런 문장이 있다.
+
+<i>"그 아이와 나는 같은 피를 나눴다. 그 피를 모두 차지하는 자만이 아버지의 자리에 오를 것이다."</i>`}
+,
+/* ---------- 4장: 바알의 아들 (Lv6) ---------- */
+b1_c4:{title:'발더스 게이트',text:`거대한 성문을 지나 소드 코스트 최대의 도시로 들어선다. 항구의 소금 냄새, 끝없는 인파, 그리고 곳곳에 걸린 현상수배 전단. 다행히 아직 당신 얼굴은 아니다.
+
+철의 왕좌 본부는 상층 도시의 높은 석조 건물이다. 정문은 무장한 경비들이 지킨다.`,
+ choices:[{t:'상층 도시 상점가에 들른다',go:'b1_market'},{t:'불꽃 주먹 경비대에 다바에오른의 일지를 보여준다',req:['item:다바에오른의 일지'],check:{skill:'설득',dc:13,ok:'b1_fist',fail:'b1_throne_front'}},{t:'옆 건물 지붕을 타고 넘어간다',check:{skill:'곡예',dc:13,ok:'b1_throne_roof',fail:'b1_throne_front'}},{t:'정문을 돌파한다',go:'b1_throne_front'}]},
+b1_fist:{title:'불꽃 주먹 본부',onEnter:{set:{eltan:1}},text:`불꽃 주먹 사령관 엘탄 공작이 직접 일지를 읽는다. 그의 얼굴이 굳는다.
+
+"사레복… 철의 왕좌 주인 리엘타의 양아들이로군. 공개적으로 움직이면 놈들이 눈치챌 거다. 뒷문을 열어줄 테니 조용히 처리해라."
+
+엘탄 공작이 기침을 한다. 손수건에 피가 묻어난다. "요즘 몸이… 신경 쓰지 마라."`,choices:[{t:'뒷문으로 잠입한다',go:'b1_throne_roof'}]},
+b1_throne_roof:{title:'철의 왕좌 본부',text:`조용히 건물 안으로 들어선다. 꼭대기 층 회의실에는 아무도 없다. 책상 위에 남은 메모 하나.
+
+<i>"리엘타와 상인 지도자들은 캔들킵 회의로 출발. 사레복 님은 남는다."</i>
+
+캔들킵. 당신의 고향이다.`,choices:[{t:'캔들킵으로 향한다',go:'b1_keep'}]},
+b1_throne_front:{title:'철의 왕좌 본부',text:`경비들이 칼을 뽑는다. "철의 왕좌에 쳐들어오다니, 미쳤군!"`,combat:{enemies:[mob('철의 왕좌 경비',6,{n:3}),elite('경비 대장',6,{hp:30})],win:'b1_throne_roof'}},
+b1_keep:{title:'캔들킵',text:`몇 달 만에 돌아온 캔들킵. 문지기가 당신을 알아보고 반갑게 문을 연다.
+
+서고 깊은 곳 고리온의 방은 그대로다. 책상 서랍에서 고리온이 남긴 두 번째 편지를 찾는다.
+
+<i>"네 아버지는 바알, 죽은 살인의 신이다. 그는 자신의 죽음을 예견하고 필멸자들 사이에 자식을 남겼다. 너도 그중 하나다. 다른 자식들은 서로를 죽여 아버지의 힘을 되찾으려 할 것이다. 나는 너를 그런 운명에서 지키고 싶었다. 너는 네 피가 아니라 네 선택으로 정의된다는 걸 잊지 마라."</i>
+
+손이 떨린다. 이모엔이 말없이 당신 손을 잡는다.`,
+ choices:[{t:'회의장으로 가서 사레복의 음모를 알린다',go:'b1_keep_murder'}]},
+b1_keep_murder:{title:'캔들킵 회의장',text:`회의장 문을 연 순간, 피 냄새가 코를 찌른다. 리엘타와 상인 지도자들이 모두 죽어 있다.
+
+등 뒤에서 수도사들이 외친다. "살인자다! 고리온의 피후견인이 지도자들을 죽였다!"
+
+당신은 순식간에 포위된다. 성채의 수호자 울라운트가 차갑게 명령한다. "가둬라."`,
+ choices:[{t:'저항하지 않고 끌려간다',go:'b1_cell'},{t:'"이건 함정이다!" 하고 수도사들의 얼굴을 살핀다',check:{skill:'통찰',dc:14,ok:'b1_dopple_spot',fail:'b1_cell'}}]},
+b1_dopple_spot:{title:'캔들킵 회의장',text:`소리치는 수도사들의 눈동자가 잿빛으로 일렁인다. 변신자들이다! 당신이 외치자 가짜 수도사들이 정체를 드러내며 덤벼든다.`,combat:{enemies:[mob('변신자',6,{n:3})],win:'b1_catacomb'}},
+b1_cell:{title:'캔들킵 감옥',text:`어둑한 감옥. 밤이 깊자 늙은 수도사 테스토릴이 몰래 찾아온다.
+
+"나는 네가 하지 않았다는 걸 안다. 고리온이 너를 어떻게 키웠는지 봤으니까." 그가 문을 연다. "지하 묘지로 나가는 길이 있다. 조심해라. 그 아래엔 산 자도, 죽은 자도 아닌 것들이 있다."`,choices:[{t:'지하 묘지로',go:'b1_catacomb'}]},
+b1_catacomb:{title:'캔들킵 지하 묘지',text:`촛불 하나에 의지해 오래된 묘지를 지난다. 그때 앞쪽에서 익숙한 목소리가 들린다.
+
+"…얘야, 나다."
+
+고리온이 서 있다. 살아 있는 모습 그대로. 그가 팔을 벌린다. "이리 오너라. 다 설명해주마."`,
+ choices:[{t:'"…당신은 고리온이 아니야."',check:{skill:'통찰',dc:12,ok:'b1_fake_gorion',fail:'b1_fake_hug'}},{t:'고리온에게 달려간다',go:'b1_fake_hug'}]},
+b1_fake_hug:{title:'지하 묘지',onEnter:{dmg:'2d8'},text:`품에 안기는 순간 등에 칼날이 박힌다. "고리온"의 얼굴이 녹아내린다. 변신자다!`,combat:{enemies:[elite('변신자 (고리온의 얼굴)',6),mob('변신자',6,{n:2})],win:'b1_escape'}},
+b1_fake_gorion:{title:'지하 묘지',text:`"고리온은 나를 '얘야'라고 부른 적이 없어." 당신의 말에 가짜 고리온의 얼굴이 일그러지며 녹아내린다. 어둠 속에서 다른 변신자들도 기어 나온다.`,combat:{enemies:[elite('변신자 (고리온의 얼굴)',6,{hp:30}),mob('변신자',6)],win:'b1_escape'}},
+b1_escape:{title:'발더스 게이트',text:`묘지를 빠져나와 밤새 걸어 발더스 게이트로 돌아온다. 이제 도시 곳곳에 당신의 얼굴이 그려진 현상수배 전단이 붙어 있다. '캔들킵 학살자'.
+
+그리고 거리마다 같은 소식이 울려 퍼진다. 엘탄 공작이 독에 쓰러졌고, 내일 <b>사레복이 새 대공작으로 즉위한다.</b>
+
+자헤이라가 이를 간다. "놈이 도시를 통째로 삼키려 해. 증거가 필요하다. 놈이 직접 쓴 것."`,
+ choices:[{t:'사레복의 저택에 숨어든다',check:{skill:'은신',dc:13,ok:'b1_diary',fail:'b1_manor_fight'}},{t:'증거 없이 바로 대공 궁전으로 간다',go:'b1_palace'}]},
+b1_manor_fight:{title:'사레복의 저택',text:`경비견이 짖는다! 저택 경비들이 몰려온다.`,combat:{enemies:[mob('저택 경비',6,{n:2}),mob('경비견',6,{hp:16})],win:'b1_diary'}},
+b1_diary:{title:'사레복의 저택',onEnter:{set:{diary:1},item:'사레복의 일기'},text:`사레복의 침실, 검은 장정의 일기장. 그 안에는 모든 것이 적혀 있다. 고리온 살해, 철의 위기, 지도자 암살, 엘탄 공작 독살. 그리고 마지막 장.
+
+<i>"대공작이 되면 앰과 전쟁을 일으킨다. 수많은 죽음이 아버지 바알의 힘을 내게 모아줄 것이다. 그리고 나는 신이 된다."</i>`,
+ choices:[{t:'대공 궁전으로',go:'b1_palace'}]},
+b1_palace:{title:'대공 궁전',text:f=>`대관식장. 귀족들 사이로 검은 판금 갑옷의 거인이 걸어 나온다. 이제 투구를 벗은 그의 얼굴. 사레복이다. 고리온을 죽인 그 거인.
+
+당신이 홀 한가운데로 걸어 나가자 사람들이 술렁인다.${f.diary?'\n\n품속에 사레복의 일기가 있다.':''}`,
+ choices:[{t:'일기를 펼쳐 귀족들 앞에서 낭독한다',req:['diary'],check:{skill:'설득',dc:11,ok:'b1_expose',fail:'b1_palace_fight'}},{t:'"이자가 진짜 살인자다!" 하고 외친다',not:['diary'],check:{skill:'설득',dc:16,ok:'b1_expose',fail:'b1_palace_fight'}},{t:'곧장 사레복에게 달려든다',go:'b1_palace_fight'}]},
+b1_expose:{title:'대공 궁전',onEnter:{set:{exposed:1}},text:`일기의 문장들이 홀에 울려 퍼질수록 귀족들의 얼굴이 하얗게 질린다. 벨트 공작이 일어선다. "경비대! 저자를 체포하라!"
+
+사레복이 처음으로 웃는다. "형제여. 결국 여기까지 왔구나." 그의 부하들이 연막을 터뜨린다. 연기가 걷히자 사레복은 사라지고 없다. 바닥에 하수도로 이어지는 비밀 문이 열려 있다.`,choices:[{t:'사레복을 쫓는다',go:'b1_undercity'}]},
+b1_palace_fight:{title:'대공 궁전',text:`"저 살인자를 잡아라!" 사레복의 외침에 그의 부하들이 덤벼든다. 혼란 속에서 사레복은 비밀 문으로 사라진다.`,combat:{enemies:[mob('사레복의 부하',6,{n:3})],win:'b1_undercity'}},
+b1_undercity:{title:'지하 도시',text:`도시 아래, 잊혀진 옛 거리. 그 끝에 바알의 신전이 있다. 해골과 피로 장식된 거대한 홀.
+
+신전 입구에서 날렵한 여인이 길을 막는다. 사레복의 연인이자 부하인 타모코다.
+
+"돌아가라. 그는… 그는 원래 이런 사람이 아니었어. 피가 그를 미치게 만들었을 뿐이야."`,
+ choices:[{t:'"그는 너를 버릴 거다. 일기에 그렇게 적혀 있었다."',req:['diary'],check:{skill:'설득',dc:12,ok:'b1_tamoko_go',fail:'b1_final_rest'}},{t:'"비켜라."',go:'b1_final_rest'}]},
+b1_tamoko_go:{title:'지하 도시',onEnter:{set:{tamoko_gone:1}},text:`타모코의 손이 떨린다. 일기의 한 구절을 보여주자, 그녀는 눈을 감고 칼을 내려놓는다.
+
+"…알고 있었어. 처음부터." 그녀는 어둠 속으로 사라진다.`,choices:[{t:'신전으로 들어간다',go:'b1_final_rest'}]},
+b1_final_rest:{title:'바알의 신전 앞',text:`신전 문 너머에서 의식의 노래가 들린다. 마지막 싸움이다.
+
+민스크가 부를 쓰다듬는다. 이모엔이 단검을 고쳐 쥔다. 자헤이라가 고개를 끄덕인다.`,
+ choices:[{t:'모두 함께 숨을 고른다',sub:'짧은 휴식 · 한 번만',not:['r4'],set:{r4:1},rest:1,go:'b1_final_rest'},{t:'신전으로 들어간다',go:'b1_sarevok'}]},
+b1_sarevok:{title:'바알의 신전',text:f=>`피의 제단 위에 사레복이 서 있다. 그가 거대한 검을 들어 올린다.
+
+"고리온은 너를 숨겼지. 나는 버려졌다. 같은 피, 다른 운명. 오늘 그 피를 하나로 합치겠다, 형제여."${f.tamoko_gone?'':'\n\n그의 곁에 타모코가 칼을 뽑아 든다.'}`,
+ combat:f=>({enemies:[boss('사레복',6,{hp:95,ac:17,dmg:'2d6+4'}),elite('사레복의 마법사 세마이',6,{hp:30,ac:12})].concat(f.tamoko_gone?[]:[elite('타모코',6,{hp:35,ac:15})]),win:'b1_end'})},
+b1_end:{title:'에필로그',ending:'win',onEnter:{gold:500},text:`사레복이 무릎을 꿇는다. 그의 몸에서 검붉은 기운이 빠져나와 신전 바닥으로 스며든다. 마지막 순간 그는 웃는 것도 우는 것도 아닌 얼굴로 중얼거린다.
+
+<i>"…이것이 끝이 아니다, 형제여."</i>
+
+며칠 뒤, 발더스 게이트는 당신을 영웅으로 맞는다. 엘탄 공작은 해독제로 회복하고, 앰과의 전쟁은 없던 일이 된다. 사람들은 당신의 이름을 노래한다. 당신 핏속의 비밀을 아는 이는 몇 되지 않는다.
+
+그날 밤, 축하연이 끝나고 일행과 함께 여관으로 돌아가는 길. 골목의 그림자가 이상하게 짙다. 누군가 당신의 이름을 부른다. 그리고 세상이 어두워진다.
+
+<b>— 발더스 게이트 1 완료 · 이야기는 2편 「앰의 그림자」로 이어집니다 —</b>`}
+}});
+
+/* ===== 발더스 게이트 2: 앰의 그림자 (게임 줄거리를 바탕으로 새로 쓴 축약판 + 오리지널 외전 장면) ===== */
+CAMP({id:'bg2',title:'발더스 게이트 2: 앰의 그림자',short:'BG2 앰의 그림자',sub:'게임 2편 줄거리 · 4장',
+ desc:'사레복을 쓰러뜨린 영웅은 어둠 속에서 납치된다. 눈을 뜬 곳은 정체불명의 마법사 이레니쿠스의 실험실. 그는 당신 핏속의 무언가를 원한다.',
+ startLevel:7,startGold:150,hpMul:1.5,
+ comps:{
+  imoen:{name:'이모엔',role:'striker',desc:'여전히 밝은 척하지만, 감옥에서 무언가를 당했다.'},
+  minsc:{name:'민스크',role:'tank',desc:'부와 함께라면 지옥도 두렵지 않은 레인저.'},
+  jaheira:{name:'자헤이라',role:'healer',desc:'칼리드를 잃은 슬픔을 분노로 버티는 드루이드.'},
+  yoshimo:{name:'요시모',role:'striker',desc:'유쾌한 현상금 사냥꾼. 어딘가 속을 알 수 없다.'},
+  aerie:{name:'아에리',role:'caster',desc:'날개를 잃은 아바리엘 엘프. 수줍은 마법사이자 사제.'},
+  keldorn:{name:'켈도른',role:'tank',desc:'래디언트 하트 기사단의 노련한 성기사.'}
+ },
+ chapters:[{title:'이레니쿠스의 던전',start:'b2_start'},{title:'애스카틀라의 거래',start:'b2_c2'},{title:'스펠홀드와 언더다크',start:'b2_c3'},{title:'생명의 나무',start:'b2_c4'}],
+ nodes:{
+/* ---------- 1장: 이레니쿠스의 던전 (Lv7) ---------- */
+b2_start:{title:'???',text:`차가운 쇠창살. 몸 곳곳에 남은 바늘 자국. 당신은 철창 안에서 눈을 뜬다.
+
+어둠 속에서 낮은 목소리가 들린다. 창백한 얼굴, 차가운 눈의 마법사가 당신을 내려다본다.
+
+<i>"아직 버티는군. 좋아. 네 안의 힘은… 생각보다 깊어. 조금만 더 들여다보자꾸나."</i>
+
+그가 손을 드는 순간, 천장 너머로 폭음이 울린다. 누군가 이곳을 습격하고 있다. 마법사는 혀를 차며 사라진다.
+
+잠시 뒤, 익숙한 분홍 머리가 창살 앞에 나타난다. "일어나! 지금이 기회야!" 이모엔이다. 그녀가 자물쇠를 딴다.`,
+ choices:[{t:'이모엔과 함께 감방을 나선다',go:'b2_cells'}]},
+b2_cells:{title:'감옥 복도',onEnter:{join:['imoen','minsc','jaheira']},text:`복도의 다른 철창들에서 민스크와 자헤이라를 찾아낸다. 민스크는 부를 품에 안고 있다. "부도 무사하다! 부는 굶었지만 용감했다!"
+
+자헤이라는 말이 없다. 그녀의 시선이 복도 끝 철창에 고정돼 있다. 그 안에 칼리드가 누워 있다. 움직이지 않는다.
+
+"…그 마법사가 실험했어. 칼리드에게." 자헤이라의 목소리가 갈라진다. "울 시간은 나중이다. 지금은 나가야 해."
+
+복도 끝의 다른 감방에서 동양풍 옷차림의 남자가 손을 흔든다. "이봐, 나도 좀 꺼내주지 않겠나? 요시모라고 하네. 나도 그 미친 마법사한테 잡혀왔지."`,
+ choices:[{t:'요시모를 꺼내준다',join:'yoshimo',go:'b2_lab'},{t:'믿을 수 없다. 그냥 간다',go:'b2_lab'}]},
+b2_lab:{title:'이레니쿠스의 실험실',text:`유리병 속에 무언가 떠다니는 실험실. 원소 정령 메피트들이 날아다니고, 구석에서 살덩이로 빚은 골렘이 몸을 일으킨다.
+
+벽의 제어 문양이 골렘을 조종하는 것 같다.`,
+ choices:[{t:'제어 문양을 해석해 골렘을 멈춘다',check:{skill:'비전',dc:15,ok:'b2_lab_half',fail:'b2_lab_fight'}},{t:'싸워서 뚫는다',go:'b2_lab_fight'}]},
+b2_lab_half:{title:'이레니쿠스의 실험실',text:`문양 하나를 손끝으로 지우자 골렘이 그대로 굳는다. 하지만 메피트들이 키득거리며 덤벼든다.`,combat:{enemies:[mob('불꽃 메피트',7,{n:3})],win:'b2_dryad'}},
+b2_lab_fight:{title:'이레니쿠스의 실험실',text:`골렘이 비틀거리며 다가오고, 메피트들이 불꽃을 뿜는다!`,combat:{enemies:[elite('살덩이 골렘',7),mob('불꽃 메피트',7,{n:2})],win:'b2_dryad'}},
+b2_dryad:{title:'갇힌 정원',text:`실험실 안쪽, 마법으로 만든 작은 숲. 나무 정령 드라이어드 셋이 유리 벽 안에 갇혀 있다.
+
+"부탁이에요… 저 마법사가 우리 도토리를 빼앗아 갔어요. 도토리가 없으면 숲으로 돌아갈 수 없어요. 저 옆방 상자에 있어요."
+
+옆방에는 병 속에 갇힌 지니도 있다. "나를 풀어주면 보답하지, 필멸자."`,
+ choices:[{t:'도토리를 찾아 드라이어드를 풀어준다',not:['dryad'],set:{dryad:1},go:'b2_dryad_free'},{t:'지니의 병을 연다',not:['genie'],set:{genie:1},go:'b2_genie'},{t:'출구를 찾는다',go:'b2_exit'}]},
+b2_dryad_free:{title:'갇힌 정원',onEnter:{heal:'3d8',loot:'u_acorn'},text:`도토리를 돌려주자 드라이어드들이 노래하며 빛 속으로 사라진다. 그 빛이 당신의 상처를 감싸 아물게 한다.
+
+자헤이라가 오랜만에 희미하게 웃는다.`,choices:[{t:'돌아선다',go:'b2_dryad'}]},
+b2_genie:{title:'병 속의 지니',onEnter:{potions:2},text:`병에서 푸른 연기가 솟구쳐 거대한 지니가 된다. "자유다! 약속대로." 그가 손가락을 튕기자 물약 두 병이 나타난다.
+
+"한 가지 더 알려주지. 너를 가둔 자의 이름은 이레니쿠스. 그는 엘프였지만, 엘프이길 버린 자다."`,choices:[{t:'돌아선다',go:'b2_dryad'}]},
+b2_exit:{title:'던전 출구',text:`계단을 오르자 그림자 도적단 암살자들이 쓰러져 있다. 이들이 습격한 자들이다. 하지만 출구 앞에 아직 살아 있는 이레니쿠스의 하수인들이 버티고 있다.`,combat:{enemies:[mob('복제인간 경비',7,{n:2}),elite('던전 관리인',7)],win:'b2_street'}},
+b2_street:{title:'애스카틀라 거리',text:`햇빛. 몇 달 만의 햇빛이다. 그곳은 앰의 수도, 애스카틀라였다.
+
+광장에서 이레니쿠스가 그림자 도적단 암살자들을 마법으로 날려버리고 있다. 그때 이모엔이 앞으로 뛰쳐나간다.
+
+"너 이 자식! 우리한테 무슨 짓을 한 거야!" 그녀의 손끝에서 마법 화살이 날아간다.
+
+순간, 공기가 찢어지며 두건 쓴 마법사들이 나타난다. <b>두건 쓴 마법사단</b>. 이 나라에서 허가 없이 마법을 쓰는 자를 잡아가는 자들이다.
+
+"허가 없는 마법 사용. 둘 다 연행한다." 이레니쿠스가 비웃는다. "좋아, 데려가라. 단, 이 아이도 함께라면." 이모엔과 이레니쿠스가 빛 속으로 사라진다.`,
+ choices:[{t:'"이모엔!!"',go:'b2_c1_end'}]},
+b2_c1_end:{title:'1장 끝',chapterEnd:true,onEnter:{leave:'imoen'},text:`광장에 정적이 내려앉는다. 이모엔이 사라졌다.
+
+망토 두른 남자가 다가온다. "가엘란 베일이오. 친구분이 끌려간 곳은 <b>스펠홀드</b>. 마법 범죄자들을 가두는 섬의 정신병원이지. 그곳에 가는 배편을 구하려면… 금화 2만 닢쯤 필요할 거요. 일거리를 소개해 드릴 수 있소만."
+
+자헤이라가 당신의 어깨를 잡는다. "칼리드를 잃었다. 이모엔까지 잃을 순 없어."`}
+,
+/* ---------- 2장: 애스카틀라의 거래 (Lv8) ---------- */
+b2_c2:{title:'애스카틀라 빈민가',text:`가엘란 베일의 은신처. 그가 두 가지 제안을 늘어놓는다.
+
+"그림자 도적단의 수장 아란 린베일 님이 돈을 대주겠다고 하시오. 대가로 그분의 전쟁을 도와야 하지. 요즘 도시에 흡혈귀 길드가 들어와서 도적단과 전쟁 중이거든."
+
+그날 밤, 여관 창밖에 창백한 여인이 나타난다. "나는 보디. 도적단보다 더 빨리, 더 많이 주지. 대신 내 편에 서."
+
+어느 쪽이든 먼저 돈을 모아야 한다. 도시에는 일거리가 넘친다.`,
+ choices:[{t:'그림자 도적단과 손을 잡는다',not:['side'],set:{side:1,thieves:1},go:'b2_jobs'},{t:'창백한 여인 보디와 손을 잡는다',not:['side'],set:{side:1,vamp:1},go:'b2_jobs'}]},
+b2_jobs:{title:'애스카틀라',text:f=>`금화 2만 닢. 큰돈이다. 도시 곳곳에서 일거리를 모은다.${(f.job_circus?1:0)+(f.job_pit?1:0)+(f.job_keep?1:0)>=2?'\n\n<b>충분한 돈이 모였다!</b>':''}`,
+ choices:[
+  {t:'와우킨 광장 시장에서 장비를 산다',go:'b2_market'},
+  {t:'와우킨 광장의 이상한 서커스 천막 조사',not:['job_circus'],go:'b2_circus'},
+  {t:'구리 왕관 주점 지하의 노예 투기장 소탕',not:['job_pit'],go:'b2_pit'},
+  {t:'트롤에게 점령당한 드아르니스 성 탈환',not:['job_keep'],go:'b2_keep'},
+  {t:'모은 돈을 들고 결판을 지으러 간다',req:['job_circus','job_pit'],go:'b2_war'},
+  {t:'모은 돈을 들고 결판을 지으러 간다',req:['job_circus','job_keep'],not:['job_pit'],go:'b2_war'},
+  {t:'모은 돈을 들고 결판을 지으러 간다',req:['job_pit','job_keep'],not:['job_circus'],go:'b2_war'}]},
+b2_circus:{title:'와우킨 광장',text:`광장 한복판의 서커스 천막. 들어가자마자 세상이 일그러진다. 관객은 인형이 되고, 광대들은 이빨을 드러낸다. 환영이다.
+
+천막 깊은 곳에서 날개 없는 엘프 소녀의 울음소리가 들린다.`,
+ choices:[{t:'환영의 틈을 찾는다',check:{skill:'비전',dc:15,ok:'b2_circus_boss',fail:'b2_circus_fight'}},{t:'환영 따위 베어버린다',go:'b2_circus_fight'}]},
+b2_circus_fight:{title:'뒤틀린 서커스',text:`광대 인형들이 칼날 같은 손가락을 세우고 달려든다!`,combat:{enemies:[mob('환영 광대',8,{n:3})],win:'b2_circus_boss'}},
+b2_circus_boss:{title:'서커스 무대',text:`무대 위의 작은 노움 칼라가 지팡이를 휘두른다. "다들 나를 비웃었지! 이제 내 쇼에서 영원히 박수나 쳐라!"
+
+그 옆, 새장에 갇힌 엘프 소녀가 등에 남은 날개 흉터를 감싸 안고 있다.`,combat:{enemies:[elite('환술사 칼라',8,{ac:13}),mob('환영 분신',8,{hp:14,n:2})],win:'b2_aerie'}},
+b2_aerie:{title:'와우킨 광장',onEnter:{set:{job_circus:1},join:'aerie',gold:250,loot:'u_kalah'},text:`환영이 걷히자 광장 상인들이 사례금을 들고 몰려온다.
+
+새장에서 풀려난 엘프 소녀가 수줍게 고개를 숙인다. "아에리예요. 저는… 하늘을 날던 아바리엘이었어요. 노예 상인들이 제 날개를 잘랐죠. 서커스에서 구경거리가 되던 날들도 끝이네요."
+
+그녀가 작게 웃는다. "따라가도 될까요? 마법이랑 치유 주문을 조금 할 줄 알아요."`,choices:[{t:'일거리 목록으로',go:'b2_jobs'}]},
+b2_pit:{title:'구리 왕관 주점',text:`싸구려 술과 비명이 뒤섞인 주점. 지하 투기장에서는 노예들이 짐승과 싸우고, 귀족들이 돈을 건다.
+
+주점 구석에서 은빛 갑옷의 노기사가 술잔을 내려놓는다. "켈도른이오. 래디언트 하트 기사단. 이 짓을 끝내러 왔소만, 혼자서는 버겁군. 함께하겠소?"`,
+ choices:[{t:'켈도른과 함께 투기장으로 쳐들어간다',join:'keldorn',go:'b2_pit_fight'},{t:'우리끼리 간다',go:'b2_pit_fight'}]},
+b2_pit_fight:{title:'노예 투기장',text:`투기장 감독관 레흐티난이 노예 검투사들의 쇠사슬을 풀며 웃는다. "새 손님이군! 오늘 쇼의 주인공이 되어주시오!"`,combat:{enemies:[elite('투기장 감독관',8),mob('노예 사냥꾼',8,{n:2})],win:'b2_pit_win'}},
+b2_pit_win:{title:'노예 투기장',onEnter:{set:{job_pit:1},gold:250},text:`쇠사슬이 끊어지고, 노예들이 햇빛 속으로 나간다. 감독관의 금고는 꽤 두둑했다.
+
+켈도른이 고개를 끄덕인다. "선한 일이었소. 이 도시엔 이런 곳이 아직 많지."`,choices:[{t:'일거리 목록으로',go:'b2_jobs'}]},
+b2_keep:{title:'드아르니스 성',text:`도시 북쪽 귀족 가문의 성채. 성주의 딸 날리아가 애원한다. "트롤과 이상한 괴물들이 성을 점령했어요. 아버지가 아직 안에 계세요!"
+
+트롤은 불이나 산으로 태워야 완전히 죽는다.`,
+ choices:[{t:'하인용 통로로 몰래 들어간다',check:{skill:'은신',dc:14,ok:'b2_keep_boss',fail:'b2_keep_fight'}},{t:'성문을 부수고 들어간다',go:'b2_keep_fight'}]},
+b2_keep_fight:{title:'드아르니스 성',text:`홀에 트롤들이 득실거린다. 잘린 팔이 다시 자라는 놈들이다!`,combat:{enemies:[mob('트롤',8,{hp:32,n:2})],win:'b2_keep_boss'}},
+b2_keep_boss:{title:'드아르니스 성 지하',text:`지하실, 트롤들을 부리던 존재가 몸을 일으킨다. 거대한 갑각 괴물, 엄버 헐크다. 놈의 눈을 보면 정신이 흐려진다.`,combat:{enemies:[boss('엄버 헐크',8,{hp:90,attacks:1})],win:'b2_keep_win'}},
+b2_keep_win:{title:'드아르니스 성',onEnter:{set:{job_keep:1},gold:250,loot:'u_hulk'},text:`성주를 구출하자 날리아가 눈물을 흘리며 감사한다. 성주는 큰 사례금을 내놓는다. "가문의 은인이오."`,choices:[{t:'일거리 목록으로',go:'b2_jobs'}]},
+b2_war:{title:'묘지 구역',text:f=>f.thieves?`아란 린베일이 지도를 펼친다. "보디의 은신처는 묘지 구역 지하다. 놈을 쳐주면 약속대로 배편을 대주지."
+
+밤의 묘지. 납골당 문을 열자 냉기가 쏟아져 나온다. 흡혈귀 하수인들이 붉은 눈을 번뜩인다.`:`보디가 미소 짓는다. "아란 린베일의 본부를 쳐. 그럼 배를 대주지."
+
+하지만 도적단 본부를 습격한 순간, 보디의 하수인들이 등 뒤에서 덮친다. "주인님이 그러시더군. 쓸모가 다했다고."`,
+ combat:{enemies:[elite('흡혈귀 하수인',8,{n:2}),mob('구울',8)],win:'b2_war_win'}},
+b2_war_win:{title:'묘지 구역',text:f=>`어둠 속에서 보디가 웃는다. 창백한 얼굴, 이레니쿠스와 똑같이 차가운 눈.
+
+"오라버니가 말한 대로구나. 재미있는 장난감이야." <b>오라버니</b>. 그녀는 이레니쿠스의 누이였다.
+
+"스펠홀드에서 기다릴게. 오라버니가 너를 아주 보고 싶어 하거든." 그녀는 박쥐 떼가 되어 흩어진다.${f.vamp?'\n\n배신당했지만, 뜻밖에도 아란 린베일의 사람들이 다가온다. "적의 적은 친구지. 배는 우리가 대주겠소."':'\n\n아란 린베일이 약속을 지킨다. 해적 선장 사이몬의 배가 항구에서 기다린다.'}`,
+ choices:[{t:'출항 준비를 한다',go:'b2_c2_end'}]},
+b2_c2_end:{title:'2장 끝',chapterEnd:true,text:`밀수꾼 선장 사이몬 하바리안의 배가 어둠 속에서 닻을 올린다.
+
+목적지는 해적의 섬 브린로. 그리고 그 섬 절벽 위의 정신병원, 스펠홀드.
+
+뱃전에서 아에리가 하늘을 올려다본다. 요시모는 이상하게 말이 없다. 민스크가 부에게 속삭인다. "곧 이모엔을 만날 거다. 부, 떨지 마라. 아니, 떨어도 괜찮다."`}
+,
+/* ---------- 3장: 스펠홀드와 언더다크 (Lv9) ---------- */
+b2_c3:{title:'브린로 섬',text:`해적과 밀수꾼의 섬 브린로. 절벽 위 회색 성채가 스펠홀드다. 정문은 굳게 닫혀 있다.
+
+사이몬이 계획을 속삭인다. "가장 확실한 방법은… 환자로 들어가는 거요. 내가 당신을 미친 마법사라고 신고하겠소."`,
+ choices:[{t:'환자로 위장해 들어간다',go:'b2_asylum'},{t:'해적 영주를 협박해 방문 허가증을 받는다',check:{skill:'위협',dc:15,ok:'b2_asylum',fail:'b2_pirates'}}]},
+b2_pirates:{title:'해적 영주의 저택',text:`해적 영주가 코웃음 친다. "협박? 내 섬에서?" 해적들이 칼을 뽑는다.`,combat:{enemies:[mob('해적',9,{n:3})],win:'b2_asylum'}},
+b2_asylum:{title:'스펠홀드',text:`병원 안은 기묘하게 고요하다. 환자들이 허공을 보며 중얼거린다. 복도 끝에서 원장이 당신을 맞는다.
+
+…이레니쿠스다. 그는 처음부터 이곳의 주인이었다.
+
+"어서 오너라. 기다리고 있었다. 네 친구 이모엔도 함께지. 너희 둘에겐 같은 피가 흐른다는 걸 알고 있었나?"
+
+이모엔도… 바알의 자식이었다.`,
+ choices:[{t:'달려든다',req:['has:yoshimo'],set:{yoshi:1},leave:'yoshimo',go:'b2_betray_y'},{t:'달려든다',not:['has:yoshimo'],go:'b2_betray_n'}]},
+b2_betray_y:{title:'스펠홀드',text:`당신이 움직이려는 순간, 요시모가 당신의 팔을 붙잡는다. 그의 눈이 텅 비어 있다.
+
+"미안하네, 친구… 정말 미안해. 이레니쿠스가 내게 맹약의 저주를 걸었어. 거역하면 내 심장이 멎는다고."
+
+요시모가 칼을 뽑는다.`,combat:{enemies:[elite('맹약에 묶인 요시모',9,{ac:16,dmg:'1d8+7'})],win:'b2_soul'}},
+b2_betray_n:{title:'스펠홀드',text:`이레니쿠스가 손가락을 튕기자 간수들이 사방에서 달려든다.`,combat:{enemies:[mob('스펠홀드 간수',9,{n:2})],win:'b2_soul'}},
+b2_soul:{title:'의식의 방',text:f=>`${f.yoshi?'요시모는 쓰러지며 웃는다. "…고맙네. 이제야 자유롭군."\n\n':''}이레니쿠스의 마법이 당신을 제단에 묶는다. 옆 제단엔 이모엔이 누워 있다.
+
+"너희 안의 신성한 정수, 바알의 힘. 그걸 내가 가져가겠다. 영원히 살기 위해서." 그의 손이 당신 가슴 위에 놓인다.
+
+무언가가 뜯겨나간다. 영혼의 일부가. 비명조차 나오지 않는다.
+
+눈을 떴을 때 이레니쿠스는 사라졌고, 당신은 텅 빈 껍데기처럼 차갑다. 이모엔도 마찬가지다.`,
+ choices:[{t:'이모엔을 일으킨다',go:'b2_dream'}]},
+b2_dream:{title:'악몽',onEnter:{join:'imoen'},text:`그날 밤 꿈속. 당신은 거울 앞에 서 있다. 거울 속 당신은 뿔과 발톱이 돋은 괴물, <b>학살자</b>다. 바알의 피가 빚어낸 모습.
+
+<i>"그 엘프가 네 영혼을 가져갔지. 빈자리엔 내가 들어왔다. 날 받아들여라. 그러면 아무도 너를 막지 못해."</i>
+
+깨어나니 식은땀이 흐른다. 이모엔이 당신을 보고 있다. "…너도 그 꿈 꿨구나."`,
+ choices:[{t:'"함께 빠져나가자."',go:'b2_trials'}]},
+b2_trials:{title:'스펠홀드 지하 미궁',text:`이레니쿠스는 섬 지하의 시험 미궁을 지나 도망쳤다. 미궁 입구 석판에 글이 새겨져 있다.
+
+<i>"진실을 아는 자만 지나가리라. 문은 둘. 하나는 거짓만 말하는 수호자가, 하나는 진실만 말하는 수호자가 지킨다."</i>
+
+두 석상이 동시에 입을 연다. "내 문이 출구다."`,
+ choices:[{t:'석상 하나에게 "저쪽 석상은 어느 문을 출구라 하겠나?" 묻는다',check:{skill:'조사',dc:14,ok:'b2_trial2',fail:'b2_trial_fail'}},{t:'느낌대로 왼쪽 문을 연다',go:'b2_trial_fail'}]},
+b2_trial_fail:{title:'미궁',onEnter:{dmg:'3d8'},text:`문을 연 순간 화염이 쏟아진다! 연기 속에서 반대편 문이 열린다.`,choices:[{t:'반대편 문으로',go:'b2_trial2'}]},
+b2_trial2:{title:'미궁 최심부',text:`미궁 끝, 이레니쿠스가 차원문 앞에 서 있다. 그의 몸에서 당신의 영혼 빛이 넘실거린다.
+
+"끈질기군. 하지만 네 힘은 이제 내 것이다." 그가 손을 휘두르자 간수들이 일어선다.`,
+ choices:[{t:'숨을 고르고 싸운다',sub:'짧은 휴식 후 전투',not:['r_sh'],set:{r_sh:1},rest:1,go:'b2_irenicus1'},{t:'곧장 싸운다',go:'b2_irenicus1'}]},
+b2_irenicus1:{title:'미궁 최심부',text:`"맛보거라, 네 아버지의 힘을!"`,combat:{enemies:[boss('이레니쿠스',9,{hp:110,ac:15}),mob('스펠홀드 간수',9,{hp:28})],win:'b2_underdark'}},
+b2_underdark:{title:'언더다크',text:`이레니쿠스는 쓰러지기 직전 차원문으로 몸을 던진다. 그를 쫓아 뛰어든 곳은… 끝없는 어둠의 지하 세계, 언더다크였다.
+
+버섯이 빛나는 동굴. 그곳에서 거대한 은빛 용이 당신을 내려다본다.
+
+"나는 아달론. 드로우들이 내 알을 훔쳐갔다. 알을 되찾아준다면 너희를 지상으로 보내주마. 내 마법으로 너희를 드로우의 모습으로 바꿔주겠다. 그래야 그들의 도시 우스트 나사에 들어갈 수 있을 테니."`,
+ choices:[{t:'드로우로 변장하고 우스트 나사로 간다',go:'b2_ustnatha'}]},
+b2_ustnatha:{title:'우스트 나사',text:`거미줄 모양의 탑들, 보랏빛 마법등. 드로우 도시는 아름답고 잔혹하다.
+
+알을 숨긴 곳은 여사제 파에레의 신전. 그녀는 당신이 새로 온 용병인 줄 안다. "마침 잘 왔다. 날 위해 일해라."`,
+ choices:[{t:'파에레를 속이고 신전 깊숙이 들어간다',check:{skill:'기만',dc:15,ok:'b2_eggs',fail:'b2_drow_fight'}},{t:'경비가 바뀌는 틈에 몰래 들어간다',check:{skill:'은신',dc:15,ok:'b2_eggs',fail:'b2_drow_fight'}}]},
+b2_drow_fight:{title:'우스트 나사 신전',text:`"가짜다! 지상인이다!" 드로우 전사들이 독 묻은 칼날을 뽑는다.`,combat:{enemies:[mob('드로우 전사',9,{n:2}),elite('드로우 여사제',9,{ac:15})],win:'b2_eggs'}},
+b2_eggs:{title:'신전 금고',text:`은빛으로 빛나는 용의 알 두 개. 조심스럽게 감싸 들고 도시를 빠져나온다.
+
+아달론이 알을 품고 깊은 숨을 내쉰다. "약속을 지켰구나. 이제 내 차례다." 은빛 바람이 일행을 감싸 위로, 위로 올린다.`,
+ choices:[{t:'지상으로',go:'b2_c3_end'}]},
+b2_c3_end:{title:'3장 끝',chapterEnd:true,text:`햇빛이 눈을 찌른다. 숲속, 엘프 수비대가 활을 겨눈 채 당신을 둘러싼다.
+
+"지상으로 올라온 자들이군. 이레니쿠스를 쫓는다고?" 수비대장 엘한이 활을 내린다. "그자는 우리 엘프들의 숨겨진 도시 술다네셀라르를 노리고 있다. 그 도시의 '생명의 나무'를 삼키면 그는 신이 된다."
+
+영혼을 잃은 몸이 시리다. 하지만 이모엔이 곁에 있다. "이번엔 우리가 쫓아가는 거야."`}
+,
+/* ---------- 4장: 생명의 나무 (Lv10) ---------- */
+b2_c4:{title:'엘프 숲',text:`엘한이 설명한다. "술다네셀라르는 마법으로 숨겨져 있다. 길을 여는 유일한 열쇠는 '린 란턴'. 그런데 그 란턴을… 보디가 훔쳐갔다."
+
+보디. 이레니쿠스의 누이, 흡혈귀 여왕. 그녀의 둥지는 애스카틀라 묘지 지하다.`,
+ choices:[{t:'엘프 장인의 노점에 들른다',go:'b2_elfshop'},{t:'애스카틀라로 돌아간다',go:'b2_bodhi'}]},
+b2_market:{title:'와우킨 광장 시장',shop:'b2_market',text:`세상의 온갖 물건이 모이는 앰의 시장. 마법 물품 상인이 당신의 텅 빈 눈을 보고 잠시 멈칫하더니, 이내 장사꾼의 미소를 짓는다.`,choices:[{t:'시장을 나선다',go:'b2_jobs'}]},
+b2_elfshop:{title:'엘프 장인의 노점',shop:'b2_elf',text:`피난 중인 엘프 장인이 귀한 물건들을 펼쳐 보인다. "술다네셀라르를 구해주신다면, 이것들도 제 몫을 하겠지요."`,choices:[{t:'노점을 나선다',go:'b2_c4'}]},
+b2_bodhi:{title:'보디의 둥지',text:`지하 무덤 가장 깊은 곳. 관들이 줄지어 열려 있고, 보디가 왕좌에 걸터앉아 있다.
+
+"돌아왔구나, 영혼 없는 아이야. 그 텅 빈 눈이 마음에 들어."
+
+천장의 틈으로 한 줄기 햇빛이 새어 든다. 흡혈귀가 가장 두려워하는 것.`,
+ choices:[{t:'천장 틈을 넓혀 햇빛을 쏟아붓는다',check:{skill:'운동',dc:16,ok:'b2_bodhi_sun',fail:'b2_bodhi_fight'}},{t:'성스러운 기도로 빛을 부른다',req:['class:cleric'],go:'b2_bodhi_sun'},{t:'정면으로 맞선다',go:'b2_bodhi_fight'}]},
+b2_bodhi_sun:{title:'보디의 둥지',text:`햇빛이 무덤 안을 가르자 흡혈귀들이 비명을 지르며 타들어 간다. 보디가 그림자 속으로 물러나며 이를 드러낸다.`,combat:{enemies:[boss('보디',10,{hp:85,ac:16,attacks:1})],win:'b2_lanthorn'}},
+b2_bodhi_fight:{title:'보디의 둥지',text:`보디가 손짓하자 관에서 흡혈귀들이 일어난다. "내 아이들아, 저녁 식사 시간이다."`,combat:{enemies:[boss('보디',10,{hp:110,ac:16}),mob('흡혈귀',10,{hp:30})],win:'b2_lanthorn'}},
+b2_lanthorn:{title:'보디의 둥지',onEnter:{item:'린 란턴',loot:'u_bodhi'},text:`보디의 몸이 재가 되어 무너진다. 그녀가 쥐고 있던 은빛 등불, 린 란턴이 바닥을 굴러 당신 발치에 멈춘다.
+
+자헤이라가 등불을 비춘다. 빛 속에 숲의 길이 떠오른다. "가자. 엘프들이 버티고 있을 때."`,choices:[{t:'술다네셀라르로',go:'b2_city'}]},
+b2_city:{title:'술다네셀라르',text:`나무 위에 지어진 엘프의 도시는 불타고 있다. 이레니쿠스가 부른 락샤사들과 골렘들이 거리를 휩쓴다.
+
+엘프 병사가 쓰러지며 외친다. "여왕 엘레시메님이… 사원에 붙잡혀 계십니다! 그자는 생명의 나무로 가고 있어요!"`,
+ choices:[{t:'불타는 다리를 뛰어넘어 지름길로 간다',check:{skill:'곡예',dc:14,ok:'b2_temple',fail:'b2_city_fight'}},{t:'거리의 락샤사들을 쓸어버린다',go:'b2_city_fight'}]},
+b2_city_fight:{title:'불타는 거리',text:`호랑이 머리의 락샤사들이 손을 거꾸로 뒤집으며 웃는다. "엘프의 도시에 손님이라니."`,combat:{enemies:[elite('락샤사',10,{n:2})],win:'b2_temple'}},
+b2_temple:{title:'라일리파네 사원',text:`사원 안에서 엘프 여왕 엘레시메가 마법 사슬에 묶여 있다. 그녀가 당신을 보고 슬프게 웃는다.
+
+"이레니쿠스, 아니 '요본'은 원래 우리 백성이었다. 그는… 내가 사랑했던 사람이었지. 힘을 탐하다 추방당했고, 이제 이렇게 돌아왔구나."
+
+그녀가 숨을 고른다. "생명의 나무에서 그를 막아다오. 그리고 네 영혼도 되찾아라. 그의 몸 안에 아직 남아 있으니."`,
+ choices:[{t:'사슬을 풀고 여왕의 축복을 받는다',loot:'u_ellesime',heal:'full',potions:2,set:{blessed:1},go:'b2_tree'}]},
+b2_tree:{title:'생명의 나무',text:`하늘에 닿을 듯한 거목. 그 뿌리에서 이레니쿠스가 나무의 생명력을 들이켜고 있다. 그의 몸이 빛나고, 나무는 시들어간다.
+
+그가 돌아선다. "영혼 없는 껍데기가 여기까지 오다니. 감탄스럽군."
+
+가슴 깊은 곳에서 학살자의 목소리가 속삭인다. <i>날 써라. 저놈을 찢어버려라.</i>`,
+ choices:[{t:'학살자의 힘을 받아들인다',sub:'강력하지만 대가가 있다',set:{slayer:1},heal:'full',go:'b2_final_slayer'},{t:'내 힘으로, 동료들과 함께 싸운다',go:'b2_final'}]},
+b2_final_slayer:{title:'생명의 나무',onEnter:{dmg:'2d6'},text:`뼈가 비틀리고 발톱이 돋는다. 학살자의 형상으로 이레니쿠스에게 달려든다! 분노가 고통을 삼킨다. 하지만 동료들이 두려운 눈으로 당신을 본다.`,combat:{enemies:[boss('이레니쿠스',10,{hp:120,ac:16})],win:'b2_end'}},
+b2_final:{title:'생명의 나무',text:`동료들이 당신 곁에 선다. 민스크가 외친다. "부가 말한다! 영혼은 빼앗겨도 우정은 못 빼앗는다고!"`,combat:{enemies:[boss('이레니쿠스',10,{hp:140,ac:16}),mob('복제인간 수호자',10,{hp:30})],win:'b2_end'}},
+b2_end:{title:'에필로그',ending:'win',text:f=>`이레니쿠스가 무릎을 꿇는다. 그의 몸에서 빛이 빠져나와 당신과 이모엔에게 돌아온다. 따뜻하다. 오래 잊고 있던 온기다.
+
+그는 마지막으로 엘레시메의 이름을 부르고, 어둠 속으로 끌려가듯 사라진다. 그가 계약한 지옥의 대가를 치르러.
+
+생명의 나무가 다시 푸르게 빛난다. 엘레시메 여왕이 엘프들 앞에서 당신의 이름을 부른다.${f.slayer?'\n\n하지만 학살자의 흔적은 쉽게 지워지지 않는다. 그날 이후로 당신은 가끔 손끝이 검게 변하는 꿈을 꾼다.':''}
+
+모닥불 가에서 이모엔이 당신 어깨에 기댄다. "있잖아. 우리 둘 다 그 피를 갖고 있잖아. 근데 이번엔 우리가 이겼어."
+
+멀리서, 아직 남은 바알의 자식들이 당신을 향해 눈을 뜬다. 하지만 그건 또 다른 이야기다.
+
+<b>— 발더스 게이트 2 완료 —</b>`}
+}});
+
+/* ===== 발더스 게이트 3: 마인드 플레이어의 씨앗 (게임 줄거리를 바탕으로 새로 쓴 축약판 + 오리지널 외전 장면) ===== */
+CAMP({id:'bg3',title:'발더스 게이트 3: 마인드 플레이어의 씨앗',short:'BG3 마인드 플레이어의 씨앗',sub:'게임 3편 줄거리 · 4장',
+ desc:'100여 년 뒤. 마인드 플레이어의 함선에 납치되어 눈에 올챙이가 심어진 당신. 며칠 안에 괴물이 될 운명을 피하려는 기묘한 동료들의 여정.',
+ startLevel:4,startGold:20,
+ comps:{
+  laezel:{name:'라에젤',role:'tank',desc:'오만한 기스양키 전사. 강함만이 진리다.'},
+  shadowheart:{name:'섀도하트',role:'healer',desc:'비밀이 많은 샤르의 여사제. 기억의 일부가 지워졌다.'},
+  astarion:{name:'아스타리온',role:'striker',desc:'능글맞은 하이엘프 귀족. 햇빛을 피하는 이유가 있다.'},
+  gale:{name:'게일',role:'caster',desc:'워터딥의 수다스러운 마법사. 가슴에 위험한 비밀이 있다.'},
+  wyll:{name:'윌',role:'striker',desc:'"국경의 칼날". 악마와 계약한 영웅 워락.'},
+  karlach:{name:'칼라크',role:'tank',desc:'아베르누스에서 탈출한 티플링 바바리안. 심장이 불타고 있다.'},
+  jaheira:{name:'자헤이라',role:'healer',desc:'백 년을 넘게 산 하퍼의 전설. 여전히 날카롭다.'},
+  minsc:{name:'민스크',role:'tank',desc:'돌아온 전설의 레인저. 부도 여전하다(아마도).'}
+ },
+ chapters:[{title:'노틸로이드와 숲',start:'b3_start'},{title:'부서진 성소',start:'b3_c2'},{title:'그림자 저주의 땅',start:'b3_c3'},{title:'왕관의 세 주인',start:'b3_c4'}],
+ nodes:{
+/* ---------- 1장: 노틸로이드와 숲 (Lv4) ---------- */
+b3_start:{title:'노틸로이드',text:`살덩이로 된 벽이 숨을 쉰다. 당신은 끈적한 포드 안에서 눈을 뜬다.
+
+기억나는 건 하나뿐이다. 촉수 달린 얼굴, 마인드 플레이어. 그리고 눈알 속으로 기어들던 작은 올챙이.
+
+포드가 터지듯 열린다. 창밖으로 불타는 하늘과 날아다니는 용들이 보인다. 이 배는 지옥, 아베르누스를 날고 있다.
+
+머릿속 깊은 곳에서 무언가가 꿈틀거린다. 며칠 뒤면 당신도 촉수 달린 괴물이 될 것이다.`,
+ choices:[{t:'일어나서 복도를 나선다',go:'b3_laezel'}]},
+b3_laezel:{title:'노틸로이드 복도',text:`복도 끝에서 노란 피부의 여전사가 임프들과 싸우고 있다. 기스양키다.
+
+"멍하니 서 있지 말고 칼이나 들어라, 이스틱!" 그녀가 외친다. "너도 올챙이가 박혔지? 그럼 같은 처지다. 일단 살아남자."`,combat:{enemies:[mob('임프',4,{hp:10,n:3})],allies:[{name:'라에젤',hp:40,ac:17,atk:6,dmg:'1d10+3'}],win:'b3_pod'}},
+b3_pod:{title:'노틸로이드',onEnter:{join:'laezel'},text:`임프들이 쓰러지자 여전사가 칼을 털어낸다. "라에젤이다. 이 배의 조타실로 가서 이 지옥을 빠져나간다."
+
+복도 벽의 포드 하나에서 누군가 두드린다. "거기 누구 있어요? 꺼내줘요!" 여자 목소리다.
+
+라에젤이 코웃음 친다. "약한 자는 버려라."`,
+ choices:[{t:'포드를 연다',join:'shadowheart',go:'b3_shadow'},{t:'라에젤 말대로 지나친다',go:'b3_helm'}]},
+b3_shadow:{title:'노틸로이드',text:`포드가 열리고 검은 머리의 하프엘프가 굴러 나온다. 그녀는 가슴에 무언가를 꼭 안고 있다. 이상한 문양이 새겨진 유물이다.
+
+"섀도하트예요. 고마워요. 치유 주문을 쓸 줄 아니 쓸모는 있을 거예요." 그녀는 유물을 재빨리 숨긴다.`,choices:[{t:'조타실로 서두른다',go:'b3_helm'}]},
+b3_helm:{title:'조타실',text:`조타실. 날개 달린 악마 캠비온이 마인드 플레이어와 싸우고 있다. 함선의 뇌에 연결된 신경 다발이 번쩍인다.
+
+라에젤이 외친다. "신경을 끊으면 배가 추락한다! 하지만 이대로면 우린 다 끝장이야!"
+
+캠비온이 당신을 돌아본다. "벌레들이 기어왔군."`,
+ choices:[{t:'신경 다발을 끊어 배를 추락시킨다',check:{skill:'비전',dc:12,ok:'b3_crash',fail:'b3_helm_fight'}},{t:'캠비온과 싸운다',go:'b3_helm_fight'}]},
+b3_helm_fight:{title:'조타실',text:`캠비온 잘크가 불타는 대검을 휘두른다!`,combat:{enemies:[elite('캠비온 잘크',4,{hp:34})],win:'b3_crash'}},
+b3_crash:{title:'추락',onEnter:{dmg:'1d6',loot:'u_zhalk'},text:`신경이 끊기는 순간 함선이 비명을 지르며 기운다. 지옥의 하늘이 소드 코스트의 하늘로 바뀌고, 땅이 빠르게 다가온다.
+
+…눈을 뜨니 바닷가다. 사방에 함선의 잔해가 불타고 있다.
+
+머리가 아프다. 그런데 이상하다. 올챙이는 아직 그대로인데 변신이 시작되지 않는다.`,
+ choices:[{t:'생존자를 찾는다',go:'b3_astarion'}]},
+b3_astarion:{title:'해변',text:`잔해 사이에서 은발의 엘프 남자가 손을 흔든다. "이봐, 저기 마인드 플레이어가 아직 살아 있어! 도와줘!"
+
+당신이 다가가는 순간, 그가 뒤에서 덮쳐 목에 칼을 들이댄다. "미안, 확인할 게 있어서. 너도 그 벌레 박혔지?"`,
+ choices:[{t:'몸을 비틀어 빠져나온다',check:{skill:'곡예',dc:12,ok:'b3_astar_ok',fail:'b3_astar_cut'}},{t:'"우린 같은 처지야. 칼 내려."',check:{skill:'설득',dc:12,ok:'b3_astar_ok',fail:'b3_astar_cut'}}]},
+b3_astar_cut:{title:'해변',onEnter:{dmg:'1d4+2'},text:`칼날이 목을 살짝 긋는다. 그 순간, 둘의 올챙이가 공명하며 서로의 머릿속이 섞인다. 그는 당황해 칼을 거둔다.`,choices:[{t:'일어선다',go:'b3_astar_ok'}]},
+b3_astar_ok:{title:'해변',onEnter:{join:['astarion','gale']},text:`"아스타리온이야. 하이엘프에, 귀족에… 뭐 그런 거. 같이 다니자고. 혼자보단 낫겠지."
+
+근처에서 푸른 빛의 마법진이 일렁이더니 손 하나가 튀어나온다. "어, 실례지만! 누가 좀 당겨주겠소?" 당신이 끌어내자 수염 난 마법사가 엉덩방아를 찧는다.
+
+"게일이오. 워터딥의 게일. 고맙소. 여러분도 같은 벌레 동지인가 보군. 들어보니 근처 숲에 드루이드 치유사가 있다던데."
+
+동료가 많아졌다. 함께 싸울 동료는 '동료 편성'에서 고를 수 있다.`,
+ choices:[{t:'드루이드의 숲으로 간다',go:'b3_gate'}]},
+b3_gate:{title:'에메랄드 숲 정문',text:`숲 속 드루이드 은신처의 정문. 고블린 떼가 화살을 퍼붓고 있다! 문 위에서 붉은 외투에 한쪽 눈이 돌로 된 남자가 혼자 고블린들을 막아내고 있다.
+
+"지원군인가? 고맙소! 오른쪽을 맡아주시오!"`,combat:{enemies:[mob('고블린',4,{hp:12,n:3}),elite('워그 기수',4,{hp:28})],win:'b3_grove'}},
+b3_grove:{title:'에메랄드 숲',onEnter:{join:'wyll'},text:`고블린들이 퇴각한다. 붉은 외투의 남자가 고개를 숙인다.
+
+"윌이오. 사람들은 '국경의 칼날'이라 부르지." 그는 숲 안에 피난 온 티플링 난민들을 지키는 중이었다.
+
+숲 안은 어수선하다. 드루이드들은 의식을 준비하고, 난민들은 쫓겨날까 두려워한다. 그리고 꼬마 아라벨라가 드루이드의 성물을 훔쳤다가 붙잡혀 있다.`,
+ choices:[{t:'아라벨라를 변호한다',not:['arabella'],set:{arabella:1},check:{skill:'설득',dc:13,ok:'b3_ara_ok',fail:'b3_ara_fail'}},{t:'치유사를 찾는다',go:'b3_nettie'}]},
+b3_ara_ok:{title:'에메랄드 숲',onEnter:{set:{ara_saved:1},potions:1},text:`드루이드 카가가 마지못해 아이를 풀어준다. "다음은 없다." 아라벨라의 부모가 눈물을 흘리며 물약 하나를 건넨다.`,choices:[{t:'치유사를 찾는다',go:'b3_nettie'}]},
+b3_ara_fail:{title:'에메랄드 숲',text:`카가는 꿈쩍도 하지 않는다. 하지만 당신이 시간을 끄는 사이, 아이는 몰래 풀려나 달아난다. 카가가 당신을 노려본다.`,choices:[{t:'치유사를 찾는다',go:'b3_nettie'}]},
+b3_nettie:{title:'치유사의 오두막',text:`견습 치유사 네티가 당신의 눈을 들여다보다 얼굴이 굳는다.
+
+"이런 건… 내 힘으로는 못 고쳐요. 우리 대 드루이드 할신님이라면 모를까. 그런데 할신님은 고블린 소굴을 정찰하러 가셨다가 돌아오지 않으셨어요."
+
+그녀가 지도를 펼친다. "고블린들은 언덕 위 부서진 성소에 진을 쳤어요. 그들의 지도자들은 '절대자'라는 존재를 섬긴대요."`,
+ choices:[{t:'티플링 행상인에게 들른다',go:'b3_shop1'},{t:'모두 모닥불 가에 모인다',go:'b3_c1_end'}]},
+b3_shop1:{title:'티플링 행상인',shop:'b3_grove',text:`난민 행상인 아론이 수레를 펼친다. "피난길에 챙긴 것들이에요. 싸게 드릴게요. 우릴 지켜주셨으니까."`,choices:[{t:'돌아간다',go:'b3_nettie'}]},
+b3_c1_end:{title:'1장 끝',chapterEnd:true,text:`첫날 밤. 숲 밖에 피운 모닥불 주위로 낯선 동료들이 둘러앉는다. 모두 머릿속에 같은 벌레를 품고 있다.
+
+잠이 들자 꿈을 꾼다. 금빛 피부의 아름다운 형상이 손을 내민다.
+
+<i>"두려워하지 마라. 나는 너를 지키고 있다. 올챙이의 힘을 써라. 그것이 너를 구할 것이다."</i>
+
+깨어나니 동료들도 같은 꿈을 꿨다고 한다. 각자에게 다른 얼굴로 나타난 '수호자'.`}
+,
+/* ---------- 2장: 부서진 성소 (Lv5) ---------- */
+b3_c2:{title:'강가',text:`성소로 가는 길, 강가에서 비명이 들린다. 붉은 피부에 뿔이 난 거구의 티플링 여자가 갑옷 입은 기사 셋에게 둘러싸여 있다.
+
+윌의 얼굴이 굳는다. "카를라크. 내 계약 악마가 처단하라고 명령한 '악마'다."
+
+여자가 손을 든다. "잠깐! 칼 내려! 난 악마가 아니라고! 지옥에서 겨우 도망친 거야!"`,
+ choices:[{t:'그녀의 말을 들어본다',check:{skill:'통찰',dc:12,ok:'b3_karlach_talk',fail:'b3_paladins'}},{t:'기사들 편에 선다',go:'b3_paladins'}]},
+b3_karlach_talk:{title:'강가',text:`그녀의 눈에서 거짓을 찾을 수 없다. "나는 지옥의 전쟁에서 싸우던 노예였어. 내 심장을 불타는 엔진으로 바꿔버렸지. 날 거기 팔아넘긴 놈이 발더스 게이트에 있어."
+
+그 순간 기사들이 칼을 뽑는다. 그들의 갑옷 아래로 악마의 문양이 비친다. 윌의 계약 악마가 보낸 자들이다! 윌이 이를 악문다. "…속았군."`,combat:{enemies:[mob('지옥의 기사',5,{n:3})],win:'b3_karlach'}},
+b3_paladins:{title:'강가',text:`기사들과 함께 다가가자, 그들의 갑옷 아래로 악마의 문양이 비친다. 기사들이 당신에게도 칼을 겨눈다! "목격자는 모두 죽여라!"
+
+카를라크가 도끼를 들고 당신 옆에 선다. "어이, 일단 같이 싸우자고!"`,combat:{enemies:[mob('지옥의 기사',5,{n:3})],win:'b3_karlach'}},
+b3_karlach:{title:'강가',onEnter:{join:'karlach'},text:`카를라크가 크게 웃으며 당신을 껴안는다. 뜨겁다. 정말로 몸에서 열이 난다.
+
+"고마워, 친구! 나도 올챙이 박혔어. 같이 다니자! 아, 그리고 날 아베르누스에 팔아넘긴 놈의 이름은 <b>고르타시</b>야. 언젠가 꼭 갚아줄 거야."
+
+윌이 그녀에게 고개를 숙인다. "사과하오. 나도 속은 거였소."`,
+ choices:[{t:'부서진 성소로 향한다',go:'b3_village'}]},
+b3_village:{title:'황폐한 마을',text:`성소 가는 길의 폐허 마을. 마을 끝 찻집에서 친절한 노파가 차를 권한다. "고생이 많지? 올챙이도 고쳐줄 수 있단다."
+
+아스타리온이 속삭인다. "저 할머니, 냄새가 수상해. 너무 달콤해."`,
+ choices:[{t:'노파의 정체를 꿰뚫어 본다',check:{skill:'비전',dc:13,ok:'b3_hag',fail:'b3_hag_trick'}},{t:'무시하고 성소로 간다',go:'b3_sanctum'}]},
+b3_hag_trick:{title:'찻집',onEnter:{dmg:'2d6'},text:`차를 한 모금 마시자 속이 뒤집힌다! 노파의 피부가 초록빛으로 변하고 손톱이 길어진다. 마녀, 해그다!`,combat:{enemies:[elite('해그 에델 할멈',5,{hp:45})],win:'b3_hag_win'}},
+b3_hag:{title:'찻집',text:`노파의 그림자가 사람의 것이 아니다. 당신이 꿰뚫어 보자 노파가 웃는다. "눈이 좋구나, 얘야." 그녀의 모습이 녹색 마녀로 변한다.`,combat:{enemies:[elite('해그 에델 할멈',5,{hp:38})],win:'b3_hag_win'}},
+b3_hag_win:{title:'찻집',onEnter:{potions:2,gold:60,loot:'u_hag'},text:`해그가 비명을 지르며 연기로 사라진다. 찻집 지하에서 그녀에게 납치됐던 마을 여인과 약초 물약들을 찾는다.`,choices:[{t:'부서진 성소로',go:'b3_sanctum'}]},
+b3_sanctum:{title:'부서진 성소',text:`언덕 위 옛 사원. 고블린들이 우글거린다. 정문의 고블린 경비가 당신 눈을 보더니 멈칫한다.
+
+"너… 너도 낙인이 있네? '진정한 영혼'이야?" 올챙이가 머릿속에서 꿈틀거린다. 그들은 당신을 동족으로 착각하고 있다.`,
+ choices:[{t:'"그래. 절대자를 섬기는 진정한 영혼이다."',check:{skill:'기만',dc:12,ok:'b3_inside',fail:'b3_sanctum_fight'}},{t:'올챙이의 힘으로 그의 정신을 짓누른다',check:{skill:'위협',dc:13,ok:'b3_inside',fail:'b3_sanctum_fight'}},{t:'정면 돌파',go:'b3_sanctum_fight'}]},
+b3_sanctum_fight:{title:'부서진 성소',text:`"가짜다! 죽여!" 고블린들이 몰려온다.`,combat:{enemies:[mob('고블린 전사',5,{n:3}),mob('고블린 궁수',5,{hp:16})],win:'b3_inside'}},
+b3_inside:{title:'성소 내부',text:`성소 안에는 세 지도자가 있다. 홉고블린 사제 거트, 고블린 두목 드로르 래그즐린, 그리고 드로우 전사 민타라.
+
+지하 감옥에서 곰 울음소리가 들린다. 곰으로 변신한 채 갇힌 대 드루이드 할신이다.`,
+ choices:[{t:'몰래 지하 감옥의 할신을 풀어준다',not:['halsin'],set:{halsin:1},check:{skill:'은신',dc:14,ok:'b3_halsin',fail:'b3_halsin_fight'}},
+  {t:'구석에서 숨을 돌린다',sub:'짧은 휴식 · 한 번만',not:['r32'],set:{r32:1},rest:1,go:'b3_inside'},
+  {t:'두목 드로르 래그즐린의 왕좌로 쳐들어간다',go:'b3_dror'}]},
+b3_halsin:{title:'지하 감옥',onEnter:{set:{halsin_free:1}},text:`자물쇠가 풀리자 거대한 곰이 사람으로 변한다. 근육질의 엘프, 할신이다.
+
+"구해줘서 고맙네. 그 벌레들 말이네만… 내가 보기엔 이미 몇 번이고 변했어야 했어. 뭔가 너희를 지키고 있어. 무엇인지는 모르겠지만." 그가 주먹을 쥔다. "두목과 싸운다면 함께하겠네."`,choices:[{t:'두목의 왕좌로',go:'b3_dror'}]},
+b3_halsin_fight:{title:'지하 감옥',text:`간수가 눈치챘다! "탈옥이다!"`,combat:{enemies:[mob('고블린 간수',5,{n:2})],win:'b3_halsin'}},
+b3_dror:{title:'성소 왕좌',text:f=>`부서진 신상 위 왕좌에서 거대한 고블린 드로르 래그즐린이 몸을 일으킨다. "진정한 영혼인 척하는 쥐새끼들이로군!"${f.halsin_free?'\n\n문을 부수고 거대한 곰이 뛰어든다. 할신이다!':''}`,
+ combat:f=>({enemies:[boss('드로르 래그즐린',5,{hp:75,attacks:1}),mob('고블린 호위',5,{n:2})],allies:f.halsin_free?[{name:'할신 (곰)',hp:50,ac:14,atk:6,dmg:'2d6+3'}]:[],win:'b3_c2_after'})},
+b3_c2_after:{title:'성소',onEnter:{gold:120,loot:'u_dror'},text:`드로르가 쓰러지자 고블린들이 흩어진다. 지도자들의 방에서 문서가 나온다.
+
+<i>"절대자의 군대는 그림자 저주의 땅을 건너 발더스 게이트로 진군한다. 달오름 탑에서 케테릭 소른 장군이 명령을 기다린다."</i>
+
+그날 밤 꿈에서, 수호자가 다시 나타난다. <i>"잘했다. 계속 나아가라. 해답은 남쪽 그림자 속에 있다."</i>`,
+ choices:[{t:'숲으로 돌아가 승리를 알린다',go:'b3_c2_end'}]},
+b3_c2_end:{title:'2장 끝',chapterEnd:true,text:`티플링 난민들과 드루이드들이 함께 축제를 연다. 처음으로 다 같이 웃는 밤이다. 카를라크는 춤을 추다 무언가를 태워먹고, 게일은 별자리 이야기를 늘어놓고, 아스타리온은 피곤한 척하며 끝까지 자리에 남는다.
+
+하지만 올챙이는 아직 머릿속에 있다. 그리고 절대자의 군대는 남쪽, 그림자 저주의 땅에서 기다리고 있다.`}
+,
+/* ---------- 3장: 그림자 저주의 땅 (Lv6) ---------- */
+b3_c3:{title:'그림자 저주의 땅',text:`빛이 죽은 땅. 횃불을 들어도 어둠이 살갗을 파고든다. 이곳에서는 마법의 빛 없이 오래 버틸 수 없다.
+
+멀리 희미한 빛이 보인다. 셀루네의 사제 이소벨이 지키는 여관, '마지막 빛'이다.`,
+ choices:[{t:'마지막 빛 여관으로',go:'b3_lastlight'}]},
+b3_lastlight:{title:'마지막 빛 여관',text:`여관 안은 하퍼 요원들과 피난민들로 가득하다. 하퍼들을 지휘하는 이는 은발의 하프엘프 노전사. 날카로운 눈매, 등에 멘 낫.
+
+"자헤이라다." 그녀가 당신을 훑어본다. "올챙이를 품고도 멀쩡한 자들이라. 흥미롭군. 백 년 넘게 살다 보니 별일을 다 보는구나."
+
+그 이름. 전설 속 영웅들과 함께 바알의 자식들을 쓰러뜨렸다는 그 자헤이라다.`,
+ choices:[{t:'자헤이라에게 함께 싸우자고 청한다',join:'jaheira',go:'b3_raid'},{t:'정보만 얻고 떠날 채비를 한다',go:'b3_raid'}]},
+b3_raid:{title:'마지막 빛 여관',text:`그날 밤, 여관을 감싼 빛이 흔들린다. 날개 달린 전사 마르쿠스가 이소벨을 납치하려고 쳐들어왔다! 그녀가 사라지면 여관의 빛도 꺼진다.`,combat:{enemies:[elite('날개 달린 마르쿠스',6),mob('절대자의 광신도',6,{n:2})],win:'b3_raid_win'}},
+b3_raid_win:{title:'마지막 빛 여관',text:`이소벨이 무사하다. 자헤이라가 지도를 펼친다.
+
+"케테릭 소른. 달오름 탑의 장군이지. 놈은 죽지 않는다. 몇 번을 찔러도 일어나. 그 불사의 비밀은 '나이트송'이라는 존재에 있다. 놈은 샤르의 시험장 깊은 곳에 그것을 가둬두었어."
+
+섀도하트의 얼굴이 하얘진다. 그녀가 품은 유물에 새겨진 문양이 샤르의 문양과 똑같다.`,
+ choices:[{t:'하퍼 보급관에게 장비를 받는다',go:'b3_shop2'},{t:'샤르의 시험장으로 간다',go:'b3_gauntlet'},{t:'먼저 숨을 돌린다',sub:'짧은 휴식 · 한 번만',not:['r33'],set:{r33:1},rest:1,go:'b3_raid_win'}]},
+b3_gauntlet:{title:'샤르의 시험장',text:`완전한 어둠의 신전. 바닥은 보이지 않는 낭떠러지투성이다. 벽에 새겨진 글귀.
+
+<i>"믿음 없는 눈은 길을 보지 못하리라."</i>`,
+ choices:[{t:'샤르의 교리대로 눈을 감고 걷는다',check:{skill:'종교',dc:13,ok:'b3_g2',fail:'b3_g_fall'}},{t:'바닥의 미세한 바람을 느끼며 걷는다',check:{skill:'지각',dc:14,ok:'b3_g2',fail:'b3_g_fall'}}]},
+b3_g_fall:{title:'샤르의 시험장',onEnter:{dmg:'2d8'},text:`발밑이 꺼진다! 한 층 아래로 굴러떨어진다. 다행히 길은 이어져 있다.`,choices:[{t:'일어나 계속 간다',go:'b3_g2'}]},
+b3_g2:{title:'시험장 깊은 곳',text:`그림자 속에서 샤르의 그림자 전사들이 나타난다. "침입자에게 망각을."`,combat:{enemies:[mob('그림자 전사',6,{n:3})],win:'b3_nightsong'}},
+b3_nightsong:{title:'나이트송',text:f=>`가장 깊은 곳, 빛나는 은발의 여인이 사슬에 묶여 공중에 떠 있다. 그녀가 바로 나이트송. 케테릭 소른을 불사로 만드는 힘의 원천이다.
+
+${has('shadowheart')?'섀도하트에게 머릿속 목소리가 속삭인다. 그녀의 여신 샤르가 명령한다. "죽여라. 그것이 너의 마지막 시험이다."\n\n섀도하트가 창을 든 채 떨고 있다. 그녀가 당신을 본다. "…어떻게 해야 하지?"':'그녀를 풀어주면 케테릭은 불사의 힘을 잃는다.'}`,
+ choices:[{t:'"네 마음이 원하는 대로 해."',req:['has:shadowheart'],set:{shar_free:1,nightsong:1},go:'b3_aylin'},{t:'사슬을 끊는다',not:['has:shadowheart'],set:{nightsong:1},go:'b3_aylin'}]},
+b3_aylin:{title:'나이트송',onEnter:{loot:'u_aylin'},text:f=>`${f.shar_free?'섀도하트가 창을 내던진다. 그리고 사슬을 끊는다. 순간 그녀의 손바닥에 있던 상처가 빛으로 바뀐다. 그녀가 울면서 웃는다. "…자유야. 처음으로."\n\n':''}풀려난 여인이 날개를 편다. "나는 아일린, 셀루네의 딸. 백 년 동안 갇혀 있었다." 그녀의 눈이 분노로 타오른다. "케테릭 소른. 이제 그에게 대가를 치르게 하겠다. 함께 가자."`,
+ choices:[{t:'달오름 탑으로',go:'b3_moonrise'}]},
+b3_moonrise:{title:'달오름 탑',text:`어둠 속에 우뚝 선 탑. 꼭대기에서 케테릭 소른이 의식을 진행하고 있다. 거대한 낫을 든 장군, 그의 몸에서 불사의 힘이 빠져나가는 것이 보인다.
+
+"아일린… 네가 풀려났다고? 상관없다. 절대자께서 내게 새로운 힘을 주실 것이다!"`,combat:{enemies:[boss('케테릭 소른',6,{hp:95}),mob('죽음의 수호자',6,{hp:24})],allies:[{name:'아일린',hp:60,ac:17,atk:7,dmg:'2d6+4'}],win:'b3_reveal'}},
+b3_reveal:{title:'달오름 탑',text:`케테릭이 무너지며 웃는다. "늦었다… 이미 <b>왕관</b>은 발더스 게이트에 있다. 세 명의 선택받은 자가…"
+
+그의 품에서 검게 빛나는 돌, '네더스톤'이 굴러 나온다. 그 순간 머릿속에 수호자의 목소리가 울린다. 그리고 처음으로 그 정체가 드러난다.
+
+수호자는… 마인드 플레이어였다. 일족을 배신한 마인드 플레이어, '황제'. 처음부터 당신의 올챙이를 막아준 존재.
+
+<i>"속인 것은 미안하다. 하지만 내가 없었다면 너는 이미 괴물이 되었을 것이다. 우리 목표는 같다. 이 왕관을 쥔 자들을 막는 것."</i>`,
+ choices:[{t:'케테릭의 네더스톤을 챙긴다',item:'케테릭의 네더스톤',go:'b3_c3_end'}]},
+b3_c3_end:{title:'3장 끝',chapterEnd:true,text:`케테릭의 마지막 말과 황제의 고백. 퍼즐이 맞춰진다.
+
+절대자는 신이 아니다. 죽은 세 신, 바알, 미르쿨, 바인의 선택받은 자들이 조종하는 가짜다. 그들은 '네더스톤' 세 개로 거대한 '엘더 브레인'을 조종해, 올챙이 박힌 모든 이를 노예로 만들려 한다.
+
+이제 남은 두 명. 발더스 게이트의 새 대공 <b>고르타시</b>, 그리고 바알의 선택받은 자 <b>붉은 오린</b>.
+
+카를라크가 주먹을 쥔다. "고르타시. 드디어 만나겠네."`}
+,
+/* ---------- 4장: 왕관의 세 주인 (Lv7) ---------- */
+b3_c4:{title:'발더스 게이트',text:`한 세기가 흘렀지만 발더스 게이트는 여전히 시끄럽고, 붐비고, 위험하다. 거리를 쇳덩이 병사들, 강철 감시자들이 순찰한다. 새 대공 고르타시의 군대다.
+
+하층 도시 골목에서 거대한 그림자가 길을 막는다. 근육질의 거구, 어깨 위의 작은 햄스터.
+
+"멈춰라, 악당들아! …어? 너희는 악당이 아니군. 부가 그렇게 말한다."
+
+자헤이라가 한숨을 쉰다. "민스크. 백 년이 지나도 여전하구나."`,
+ choices:[{t:'민스크를 맞이한다',join:'minsc',go:'b3_plan'}]},
+b3_shop2:{title:'하퍼 보급관',shop:'b3_harper',text:`하퍼 보급관이 상자를 연다. "자헤이라 님 친구라면 할인해 드리죠. 그래도 공짜는 아닙니다."`,choices:[{t:'돌아간다',go:'b3_raid_win'}]},
+b3_shop3:{title:'발더스 게이트 대시장',shop:'b3_city',text:`항구 옆 대시장. 강철 감시자들이 순찰하는 와중에도 상인들은 목청을 높인다. 깊은 골목엔 진짜 귀한 물건을 파는 가게들이 있다.`,choices:[{t:'은신처로 돌아간다',go:'b3_plan'}]},
+b3_plan:{title:'하퍼 은신처',text:`자헤이라가 지도 위에 두 개의 점을 찍는다.
+
+"고르타시는 철의 요새 '용의 바위'에. 오린은 지하 도시의 바알 신전에. 둘의 네더스톤을 모두 빼앗아야 엘더 브레인의 고삐를 끊을 수 있다."
+
+바알 신전. 백 년 전, 사레복이 최후를 맞았던 바로 그곳이다.`,
+ choices:[{t:'발더스 게이트 대시장에 들른다',go:'b3_shop3'},{t:'고르타시의 요새로 간다',not:['gortash_done'],go:'b3_gortash'},{t:'오린의 바알 신전으로 간다',not:['orin_done'],go:'b3_orin'},{t:'두 네더스톤을 들고 엘더 브레인에게 간다',req:['gortash_done','orin_done'],go:'b3_brain'}]},
+b3_gortash:{title:'용의 바위',text:`강철 감시자들이 지키는 요새. 고르타시는 왕좌에서 당신을 기다리고 있었다.
+
+"드디어 왔군. 우리 거래를 하자고. 오린은 미치광이다. 나와 손잡으면 이 도시를 함께 다스릴 수 있지." 그가 카를라크를 보고 웃는다. "오, 내 옛 물건도 왔네."
+
+카를라크의 심장 엔진이 굉음을 낸다.`,
+ choices:[{t:'"거절한다."',go:'b3_gortash_fight'},{t:'거래하는 척 그의 방어 장치를 알아낸다',check:{skill:'기만',dc:15,ok:'b3_gortash_weak',fail:'b3_gortash_fight'}}]},
+b3_gortash_weak:{title:'용의 바위',text:`거래를 받아들이는 척하며 강철 감시자들의 제어 장치 위치를 알아낸다. 그리고 그것을 부순다! 고르타시가 경악한다. "이 배신자가!"`,combat:{enemies:[boss('고르타시',7,{hp:95,dmg:'2d6+4'})],win:'b3_gortash_win'}},
+b3_gortash_fight:{title:'용의 바위',text:`고르타시가 손가락을 튕기자 강철 감시자가 일어선다. "아깝군. 쓸모 있는 장난감이 될 수 있었는데."`,combat:{enemies:[boss('고르타시',7,{hp:95,dmg:'2d6+4'}),elite('강철 감시자',7,{ac:18})],win:'b3_gortash_win'}},
+b3_gortash_win:{title:'용의 바위',onEnter:{set:{gortash_done:1},item:'고르타시의 네더스톤'},text:f=>`고르타시가 쓰러진다. 그의 손에서 두 번째 네더스톤이 빠져나온다.${has('karlach')?'\n\n카를라크가 그의 시신 앞에 서서 한참을 말이 없다. "…생각보다 시원하지 않네." 그녀가 웃는다. 눈가가 젖어 있다.':''}`,
+ choices:[{t:'은신처로 돌아간다',go:'b3_plan'}]},
+b3_orin:{title:'바알의 신전',text:`해골과 피로 장식된 신전. 백 년 전과 똑같다. 제단 위의 붉은 형체가 계속 모습을 바꾼다. 당신의 얼굴, 동료의 얼굴, 그리고 다시 당신.
+
+"반가워, 반가워." 변신자 붉은 오린이 킥킥댄다. "아버지 바알이 너를 아주 좋아할 거야. 피를 바치면."`,
+ choices:[{t:'그녀의 진짜 위치를 찾아낸다',check:{skill:'통찰',dc:14,ok:'b3_orin_fight',fail:'b3_orin_trick'}},{t:'제단으로 돌진한다',go:'b3_orin_trick'}]},
+b3_orin_trick:{title:'바알의 신전',onEnter:{dmg:'2d8'},text:`당신이 벤 것은 분신이었다! 진짜 오린이 등 뒤에서 단검을 꽂는다. "느려, 느려!"`,combat:{enemies:[boss('붉은 오린',7,{hp:90,dmg:'2d6+4'}),mob('바알 광신도',7,{n:2})],win:'b3_orin_win'}},
+b3_orin_fight:{title:'바알의 신전',text:`그림자의 흔들림, 그것이 진짜다. 당신의 칼끝이 그녀를 향하자 오린이 처음으로 웃음을 멈춘다.`,combat:{enemies:[boss('붉은 오린',7,{hp:80,dmg:'2d6+4'}),mob('바알 광신도',7)],win:'b3_orin_win'}},
+b3_orin_win:{title:'바알의 신전',onEnter:{set:{orin_done:1},item:'오린의 네더스톤'},text:`오린의 몸이 핏빛 웅덩이로 녹아내린다. 세 번째 네더스톤.
+
+신전 벽에 오래된 낙서가 있다. 백 년 전 누군가 새긴 것이다. <i>"피가 아니라 선택이 우리를 정의한다."</i>
+
+자헤이라가 그 낙서를 오래 바라본다.`,
+ choices:[{t:'은신처로 돌아간다',go:'b3_plan'}]},
+b3_brain:{title:'상층 도시',text:`세 개의 네더스톤이 공명한다. 도시 하늘 위로 거대한 뇌, 엘더 브레인이 떠오른다. 수천의 올챙이 박힌 사람들이 멍한 눈으로 하늘을 올려다본다.
+
+머릿속의 황제가 말한다. <i>"이제 네더스톤으로 브레인을 지배하자. 내가 그것을 다스리면 모두 자유로워질 것이다."</i>
+
+하지만 라에젤의 기억 속 기스양키 왕자 오르페우스가 외친다. 황제가 감금하고 있던 그 왕자다. <i>"믿지 마라! 저 마인드 플레이어는 결국 자기 일족의 길을 갈 것이다. 나를 풀어라. 함께 싸우겠다."</i>`,
+ choices:[{t:'황제를 믿는다',set:{emperor:1},go:'b3_final_rest'},{t:'오르페우스 왕자를 풀어준다',check:{skill:'설득',dc:14,ok:'b3_orpheus',fail:'b3_final_rest'}}]},
+b3_orpheus:{title:'상층 도시',onEnter:{set:{orpheus:1}},text:`마음속 감옥의 문이 열린다. 은빛 갑옷의 기스양키 왕자가 걸어 나온다. 황제의 분노한 목소리가 사라진다.
+
+오르페우스가 검을 뽑는다. "백 년 만의 자유다. 이 검은 너를 위해 쓰겠다."`,choices:[{t:'최후의 결전으로',go:'b3_final_rest'}]},
+b3_final_rest:{title:'최후의 전야',text:`엘더 브레인이 있는 하늘의 신경 다리 앞. 동료들이 모인다.
+
+아스타리온이 농담을 하고, 게일이 별을 올려다보고, 카를라크가 심장 엔진을 두드린다. 라에젤은 처음으로 당신에게 고개를 숙인다. "…좋은 전사다, 너는."`,
+ choices:[{t:'모두 함께 숨을 고른다',sub:'짧은 휴식 · 한 번만',not:['r34'],set:{r34:1},rest:1,go:'b3_final_rest'},{t:'엘더 브레인에게 간다',go:'b3_final'}]},
+b3_final:{title:'네더브레인',text:f=>`거대한 뇌가 촉수를 휘두르며 마인드 플레이어들을 불러낸다. 도시 전체가 그것의 숨결로 떨린다.
+
+${f.orpheus?'오르페우스 왕자가 칼을 들고 앞장선다.':'황제가 당신 곁에 실체로 나타나 촉수를 펼친다.'}`,
+ combat:f=>({enemies:[boss('네더브레인',7,{hp:150,ac:15,dmg:'2d6+4'}),mob('마인드 플레이어',7,{hp:30})],allies:[f.orpheus?{name:'오르페우스 왕자',hp:80,ac:18,atk:8,dmg:'2d6+5'}:{name:'황제',hp:70,ac:15,atk:8,dmg:'2d8+3'}],win:'b3_end'})},
+b3_end:{title:'에필로그',ending:'win',text:f=>`엘더 브레인이 비명을 지르며 무너진다. 그 순간 수천 명의 머릿속에서 올챙이가 죽어간다. 당신의 머릿속에서도.
+
+조용하다. 처음으로, 머릿속이 오롯이 당신 것이다.
+
+${f.orpheus?'오르페우스 왕자는 기스양키 백성에게 돌아가 여왕의 폭정에 맞서겠다고 맹세한다. 라에젤이 그의 곁에 무릎을 꿇는다.':'황제는 고개를 숙이고 떠난다. "약속은 지켰다. 이제 우리는 각자의 길을 간다." 그가 정말 선한 존재였는지는, 아무도 모른다.'}
+
+며칠 뒤, 동료들이 저마다의 길로 흩어지기 전 마지막 밤. 다 같이 마지막 모닥불에 둘러앉는다. 카를라크가 크게 웃고, 아스타리온이 투덜대고, 게일이 건배를 외친다. 민스크가 부를 높이 든다.
+
+자헤이라가 당신에게만 들리게 말한다. "백 년 전에도 이런 밤이 있었지. 이 도시는 늘 영웅을 낳는구나."
+
+<b>— 발더스 게이트 3 완료 · 모든 이야기가 끝났습니다 —</b>`}
+}});
+
+/* ===== 외전: 얼굴 없는 밀수꾼 ===== */
+(function(){
 const FOES={
  bouncer:{name:'문지기 보른',hp:15,ac:12,atk:4,dmg:'1d6+2',save:1},
  doppel:{name:'변신자',hp:16,ac:13,atk:4,dmg:'1d6+1',save:2},
@@ -178,10 +1362,10 @@ const FOES={
  gate:{name:'수문 문지기',hp:18,ac:13,atk:4,dmg:'1d8+1',save:1},
  boss:{name:'회색 부인',hp:30,ac:14,atk:5,dmg:'1d8+2',save:3}
 };
-
-/* ================= 모험: 발더스 게이트 – 얼굴 없는 밀수꾼 =================
-   발더스 게이트(소드 코스트) 배경의 오리지널 이야기 */
-const NODES={
+const F=(t,o)=>Object.assign({},FOES[t],{max:(o&&o.max)||FOES[t].hp},o||{});
+CAMP({id:'faceless',title:'외전: 얼굴 없는 밀수꾼',short:'얼굴 없는 밀수꾼',sub:'오리지널 단편 · 약 1시간',desc:'발더스 게이트 하층 도시. 친구가 사라지고, 사라진 사람이 다음 날 멀쩡히 돌아온다. 혼자 하는 짧은 미스터리.',startLevel:3,startGold:20,comps:{},
+ chapters:[{title:'얼굴 없는 밀수꾼',start:'start'}],
+ nodes:{
 start:{title:'회색 항구',text:`소금기 밴 안개 사이로 발더스 게이트의 성벽이 모습을 드러낸다. 배가 회색 항구에 닿자 갈매기 울음과 하역꾼들의 고함이 뒤섞인다.
 
 품 안에는 일주일 전 받은 편지가 있다. 오랜 친구이자 항만 노동자인 토마스가 보낸 것이다.
@@ -198,8 +1382,10 @@ tavern:{title:'부서진 닻 여관',text:`낮인데도 어둑한 여관 안에 
   {t:'친구가 위험하다고 설득해 방 열쇠를 받는다',not:['room_done','refused'],check:{skill:'설득',dc:12,ok:'tavern_key',fail:'tavern_refuse'}},
   {t:'은화 5닢을 내밀고 열쇠를 산다',not:['room_done'],gold:-5,go:'tavern_key'},
   {t:'구석 테이블 하역꾼들의 대화를 엿듣는다',not:['heard'],set:{heard:1},check:{skill:'지각',dc:11,ok:'tavern_rumor',fail:'tavern_nothing'}},
+  {t:'마르다에게 물건을 산다',go:'tavern_shop'},
   {t:'창고 거리로 간다',go:'docks'},
   {t:'불꽃 주먹 초소로 간다',not:['fist_done'],go:'fist'}]},
+tavern_shop:{title:'부서진 닻 여관',shop:'f_tavern',text:`마르다가 카운터 아래에서 이것저것 꺼낸다. "손님들이 술값 대신 맡기고 간 것들이야. 쓸 만할걸."`,choices:[{t:'카운터로 돌아간다',go:'tavern'}]},
 tavern_key:{title:'부서진 닻 여관',text:`마르다가 놋쇠 열쇠를 카운터에 내려놓는다. "2층 끝 방이야. 어지르지 마. 이미 누가 어질러놨을지도 모르지만."`,choices:[{t:'2층으로 올라간다',go:'tavern_room'}]},
 tavern_refuse:{title:'부서진 닻 여관',onEnter:{set:{refused:1}},text:`마르다가 단호하게 고개를 젓는다. "손님 방을 아무한테나 열어줄 순 없어." 그녀는 행주를 어깨에 걸치고 주방으로 사라진다.
 
@@ -209,7 +1395,7 @@ tavern_refuse:{title:'부서진 닻 여관',onEnter:{set:{refused:1}},text:`마�
   {t:'포기하고 창고 거리로 간다',go:'docks'}]},
 tavern_caught:{title:'계단',text:`계단 중간에서 거대한 손이 어깨를 움켜쥔다. 여관의 문지기 보른이다.
 
-"어딜 몰래 올라가?" 대답할 틈도 없이 주먹이 날아온다!`,combat:{enemies:[{t:'bouncer'}],win:'tavern_after_fight'}},
+"어딜 몰래 올라가?" 대답할 틈도 없이 주먹이 날아온다!`,combat:{enemies:[F('bouncer')],win:'tavern_after_fight'}},
 tavern_after_fight:{title:'부서진 닻 여관',onEnter:{gold:-3},text:`보른이 의자를 부수며 바닥에 뻗는다. 마르다가 한숨을 쉰다.
 
 "…그렇게까지 토마스가 걱정된다면야." 그녀가 열쇠를 던져준다. "대신 의자값은 받아 가겠어."`,choices:[{t:'2층으로 올라간다',go:'tavern_room'}]},
@@ -236,10 +1422,10 @@ room_exit:{title:'계단참',text:`방을 나서자 계단참에 마르다가 �
  choices:[{t:'그녀의 눈을 똑바로 살핀다',check:{skill:'통찰',dc:13,ok:'ambush_spotted',fail:'ambush_hit'}},{t:'"응, 고마워." 하고 지나쳐 내려간다',go:'ambush_hit'}]},
 ambush_spotted:{title:'계단참',text:`눈동자가 순간 잿빛으로 일렁인다. 들켰다는 걸 깨달은 '마르다'의 얼굴이 밀랍처럼 흘러내리기 시작한다.
 
-하지만 당신이 한발 빨랐다. 놈이 단검을 뽑기도 전에 먼저 일격을 꽂는다!`,combat:{enemies:[{t:'doppel',name:'변신자 (마르다의 얼굴)',hp:11}],win:'ambush_win'}},
+하지만 당신이 한발 빨랐다. 놈이 단검을 뽑기도 전에 먼저 일격을 꽂는다!`,combat:{enemies:[F('doppel',{name:'변신자 (마르다의 얼굴)',hp:11})],win:'ambush_win'}},
 ambush_hit:{title:'계단참',onEnter:{dmg:'1d6+2'},text:`지나치는 순간 옆구리에 단검이 박힌다!
 
-'마르다'의 얼굴이 밀랍처럼 녹아내리며 잿빛 피부와 텅 빈 하얀 눈이 드러난다. 남의 얼굴을 훔쳐 쓰는 괴물, 변신자다.`,combat:{enemies:[{t:'doppel',name:'변신자 (마르다의 얼굴)'}],win:'ambush_win'}},
+'마르다'의 얼굴이 밀랍처럼 녹아내리며 잿빛 피부와 텅 빈 하얀 눈이 드러난다. 남의 얼굴을 훔쳐 쓰는 괴물, 변신자다.`,combat:{enemies:[F('doppel',{name:'변신자 (마르다의 얼굴)'})],win:'ambush_win'}},
 ambush_win:{title:'부서진 닻 여관',onEnter:{set:{saw_doppel:1},potions:1},text:`쓰러진 괴물의 몸이 굳어 회색 반죽 덩어리처럼 변한다.
 
 소란에 진짜 마르다가 국자를 든 채 뛰어 올라오다 그 광경에 얼어붙는다. "…이 도시가 뭔가 단단히 잘못됐어." 그녀는 말없이 <b>치유 물약</b> 하나를 당신 손에 쥐여준다.`,
@@ -261,10 +1447,10 @@ docks_window:{title:'창고 골목',text:`창고 옆 좁은 골목, 높은 곳�
 docks_bluffed:{title:'창고 정문',text:`덩치 하나가 당신을 위아래로 훑더니 턱짓한다. "늦었잖아. 안에 들어가서 소금 포대나 날라."
 
 문이 열린다.`,choices:[{t:'창고 안으로',go:'warehouse_in'}]},
-docks_spotted:{title:'창고 거리',text:`너무 티가 났다. "거기 너! 뭘 기웃거려?" 깡패 둘이 몽둥이를 휘두르며 달려온다!`,combat:{enemies:[{t:'thug'},{t:'punk'}],win:'docks_won'}},
+docks_spotted:{title:'창고 거리',text:`너무 티가 났다. "거기 너! 뭘 기웃거려?" 깡패 둘이 몽둥이를 휘두르며 달려온다!`,combat:{enemies:[F('thug'),F('punk')],win:'docks_won'}},
 docks_fight:{title:'창고 거리',text:`덩치들이 낄낄대며 다가온다. "여기 볼일 없을 텐데, 친구?"
 
-대답 대신 무기를 뽑는다.`,combat:{enemies:[{t:'thug'},{t:'punk'}],win:'docks_won'}},
+대답 대신 무기를 뽑는다.`,combat:{enemies:[F('thug'),F('punk')],win:'docks_won'}},
 docks_won:{title:'창고 거리',onEnter:{gold:8},text:`한 놈은 쓰러지고 다른 놈은 꽁지 빠지게 도망쳤다. 쓰러진 놈의 주머니에서 은화 8닢이 나온다.
 
 창고 정문이 활짝 열려 있다.`,choices:[{t:'창고 안으로',go:'warehouse_in'}]},
@@ -301,10 +1487,10 @@ warehouse_in:{title:'소금 창고',text:`천장까지 쌓인 소금 포대와 �
   {t:'안도하며 그를 따라간다',go:'fake_follow'}]},
 fake_reveal:{title:'소금 창고',text:`'토마스'의 미소가 굳는다. 주머니에서 마지못해 빠져나온 왼손바닥은 매끈하다. 흉터 하나 없이.
 
-"…눈치가 빠르네." 말이 끝나기도 전에 그의 얼굴이 흐물흐물 녹아내린다. 가짜다!`,combat:{enemies:[{t:'doppel',name:'변신자 (토마스의 얼굴)'}],win:'warehouse_main'}},
+"…눈치가 빠르네." 말이 끝나기도 전에 그의 얼굴이 흐물흐물 녹아내린다. 가짜다!`,combat:{enemies:[F('doppel',{name:'변신자 (토마스의 얼굴)'})],win:'warehouse_main'}},
 fake_follow:{title:'함정',text:`그는 당신을 창고 뒤편 함정문으로 이끈다. 사다리를 내려가자마자 <b>철컥</b>—머리 위에서 문이 잠긴다.
 
-어둠 속에서 '토마스'가 낄낄 웃는다. 그 얼굴이 촛농처럼 흘러내리고, 그림자에서 깡패 하나가 몽둥이를 들고 걸어 나온다.`,combat:{enemies:[{t:'doppel',name:'변신자 (토마스의 얼굴)'},{t:'punk',name:'하수도 깡패'}],win:'fake_follow_win'}},
+어둠 속에서 '토마스'가 낄낄 웃는다. 그 얼굴이 촛농처럼 흘러내리고, 그림자에서 깡패 하나가 몽둥이를 들고 걸어 나온다.`,combat:{enemies:[F('doppel',{name:'변신자 (토마스의 얼굴)'}),F('punk',{name:'하수도 깡패'})],win:'fake_follow_win'}},
 fake_follow_win:{title:'하수도 입구',text:`숨을 고른다. 함정문은 위에서 잠겼지만, 하수도는 어둠 속으로 계속 이어진다. 진짜 토마스는 어딘가 더 깊은 곳에 있을 것이다.`,
  choices:[{t:'벽에 기대 잠시 숨을 돌린다',sub:'짧은 휴식 · 한 번만 가능',not:['r1'],set:{r1:1},rest:1,go:'fake_follow_win'},{t:'하수도 깊이 들어간다',go:'sewer'}]},
 warehouse_main:{title:'창고 안쪽',text:`창고는 다시 조용해졌다. 구석에는 밧줄에 묶인 채 정신을 잃은 남자가 있고, 훔친 화물 상자가 쌓여 있다. 바닥에는 쇠고리가 달린 함정문이 보인다.`,
@@ -328,7 +1514,7 @@ sewer:{title:'하수도',text:`무릎까지 차오르는 오물 냄새가 코를
   {t:'벽에 바짝 붙어 소리 없이 지나간다',check:{skill:'은신',dc:12,ok:'sewer_gate',fail:'sewer_rats'}},
   {t:'횃불을 휘둘러 쥐떼를 쫓아낸다',check:{skill:'생존',dc:12,ok:'sewer_gate',fail:'sewer_rats'}},
   {t:'먼저 공격한다',go:'sewer_rats'}]},
-sewer_rats:{title:'하수도',text:`굶주린 거대 쥐들이 이빨을 드러내며 덮쳐온다!`,combat:{enemies:[{t:'rat'},{t:'rat'}],win:'sewer_gate'}},
+sewer_rats:{title:'하수도',text:`굶주린 거대 쥐들이 이빨을 드러내며 덮쳐온다!`,combat:{enemies:[F('rat'),F('rat')],win:'sewer_gate'}},
 sewer_gate:{title:'수문',text:`녹슨 철창 수문이 길을 막는다. 너머로 횃불 빛이 일렁인다. 철창 틈새로 쉰 목소리가 흘러나온다.
 
 "…암호."`,
@@ -342,7 +1528,7 @@ gate_pass:{title:'수문',text:`수문이 삐걱이며 열린다. 문지기는 �
 
 "회색 부인께서 기다리신다. 늦었어."`,choices:[{t:'안으로 들어간다',go:'cistern'}]},
 gate_sneak:{title:'수문',text:`철창이 소리 없이 열린다. 문지기는 벽에 기대 꾸벅꾸벅 졸고 있다. 그 옆을 숨죽여 지나간다.`,choices:[{t:'안으로 들어간다',go:'cistern'}]},
-gate_fight:{title:'수문',text:`"침입자다!" 문지기가 갈고리 칼을 뽑아 들고 철창을 밀어젖힌다!`,combat:{enemies:[{t:'gate'}],win:'cistern'}},
+gate_fight:{title:'수문',text:`"침입자다!" 문지기가 갈고리 칼을 뽑아 들고 철창을 밀어젖힌다!`,combat:{enemies:[F('gate')],win:'cistern'}},
 
 cistern:{title:'지하 저수조',text:`거대한 돌 아치 아래 검은 물이 고요하다. 물 한가운데 섬처럼 솟은 단 위에 <b>토마스가 기둥에 묶여 있다</b>. 진짜 토마스다. 왼손바닥의 흉터가 횃불에 비친다.
 
@@ -362,18 +1548,18 @@ final_full:{title:'지하 저수조',text:`회색 부인이 고개를 돌린다.
 
 "손님이 왔네. 마침 얼굴 하나가 더 필요했는데."
 
-졸개가 칼을 들고 물을 가르며 달려온다!`,combat:{enemies:[{t:'boss'},{t:'doppel',name:'변신자 졸개',hp:14,max:14}],win:'ending_win'}},
+졸개가 칼을 들고 물을 가르며 달려온다!`,combat:{enemies:[F('boss'),F('doppel',{name:'변신자 졸개',hp:14,max:14})],win:'ending_win'}},
 final_backup:{title:'지하 저수조',onEnter:{set:{backup:1}},text:`붉은 빛이 아치 천장을 핏빛으로 물들인다. 잠시 후 수로 저편에서 군화 소리와 함성—<b>불꽃 주먹이다!</b>
 
-병사들이 졸개를 덮쳐 물속에 처박는다. 회색 부인이 날카롭게 비명을 지르며 당신에게 달려든다.`,combat:{enemies:[{t:'boss'}],ally:{name:'불꽃 주먹 병사들',atk:4,dmg:'1d6+2'},win:'ending_win'}},
+병사들이 졸개를 덮쳐 물속에 처박는다. 회색 부인이 날카롭게 비명을 지르며 당신에게 달려든다.`,combat:{enemies:[F('boss')],allies:[{name:'불꽃 주먹 병사들',atk:4,dmg:'1d6+2',hp:30,ac:15}],win:'ending_win'}},
 final_bluff:{title:'지하 저수조',text:`졸개의 얼굴이 하얗게 질린다. "끝났어, 다 끝났다고!" 놈은 칼을 버리고 검은 물속으로 뛰어들어 달아난다.
 
-회색 부인이 이를 간다. "겁쟁이 같으니. 그럼 너라도 데려가야지."`,combat:{enemies:[{t:'boss'}],win:'ending_win'}},
+회색 부인이 이를 간다. "겁쟁이 같으니. 그럼 너라도 데려가야지."`,combat:{enemies:[F('boss')],win:'ending_win'}},
 final_freed:{onEnter:{set:{freed:1}},title:'지하 저수조',text:`기둥 뒤로 숨어든 당신이 밧줄을 끊는다. 토마스가 눈을 번쩍 뜬다.
 
 그 순간 들킨다! 하지만 토마스가 풀린 쇠사슬을 휘둘러 달려오던 졸개를 물속으로 처박는다.
 
-"이 녀석은 내가 맡을게! 저 여자를 막아!"`,combat:{enemies:[{t:'boss'}],ally:{name:'토마스',atk:3,dmg:'1d6+1'},win:'ending_win'}},
+"이 녀석은 내가 맡을게! 저 여자를 막아!"`,combat:{enemies:[F('boss')],allies:[{name:'토마스',atk:3,dmg:'1d6+1',hp:30,ac:15}],win:'ending_win'}},
 
 ending_win:{title:'에필로그',ending:'win',onEnter:{gold:100},text:f=>`회색 부인의 몸이 잿빛 밀랍처럼 무너져 내린다. 저수조에 정적이 내려앉는다.
 
@@ -393,7 +1579,8 @@ ending_flee:{title:'에필로그',ending:'flee',text:`당신은 수로를 거슬
 그리고 그 뒤로 아무도 진짜 토마스를 보지 못했다.
 
 <b>— 씁쓸한 결말 —</b>`}
-};
+}});
+})();
 
 /* ================= 오라클·랜덤 표 ================= */
 const T={
@@ -410,153 +1597,76 @@ const T={
   '도시':['소매치기가 당신의 지갑을 노린다','술 취한 귀족이 시비를 건다','경비대가 수상하다며 검문한다','거리 설교자가 종말을 외친다','쫓기는 아이가 당신 뒤에 숨는다','상인이 수상할 만큼 싼 물건을 판다','누군가 당신을 미행하고 있다','길 한복판에서 마차가 뒤집힌다','현상수배 전단에 아는 얼굴이 있다','골목에서 비명 소리가 들린다','길드 사람이 일거리를 제안한다','옛 원수와 마주친다'],
   '야생':['늑대 무리의 울음소리','부상당한 여행자','버려진 야영지','고블린 매복','길을 막는 거대한 쓰러진 나무','이상한 빛을 내는 버섯 군락','통행세를 요구하는 산적','길 잃은 상인 행렬','오래된 표지석에 새겨진 경고','갑작스러운 폭풍','오우거의 발자국','숲 요정의 장난'],
   '던전':['바닥의 압력판 함정','잠든 해골 병사들','잠긴 철문과 열쇠 구멍 두 개','바닥에 흩어진 모험가의 유품','벽에서 흘러나오는 속삭임','젤라틴 큐브','무너진 천장, 다른 길 필요','보물 상자… 혹은 미믹','고블린 정찰대','봉인된 석관','물에 잠긴 통로','도망친 포로가 도움을 청한다']},
- loot:['은화 2d10닢','금화 3d6닢','치유 물약','녹슨 열쇠','마법이 걸린 반지 (정체 불명)','낡은 보물 지도 조각','고급 단검','보석 박힌 브로치 (금화 25닢 가치)','주문 두루마리 1장','이상한 문양의 동전','은으로 된 성표','봉인된 편지'],
+ loot:['금화 2d10닢','금화 3d6닢','치유 물약','녹슨 열쇠','마법이 걸린 반지 (정체 불명)','낡은 보물 지도 조각','고급 단검','보석 박힌 브로치','주문 두루마리 1장','이상한 문양의 동전','은으로 된 성표','봉인된 편지'],
  place:['허물어진 탑','안개 낀 묘지','붐비는 시장','버려진 신전','지하 수로','귀족의 저택','부두 창고','숲속 오두막','산적 소굴','오래된 도서관','동굴 속 지하 호수','낡은 등대'],
  mood:['고요하고 불길한','시끄럽고 어수선한','습하고 냄새나는','화려하지만 공허한','오래되어 무너져 가는','이상하게 따뜻한','피비린내 나는','축제 분위기의']
 };
 const LIKE=[['거의 확실',90],['가능성 높음',75],['반반',50],['가능성 낮음',25],['거의 불가능',10]];
 
-/* ================= 상태 ================= */
-function fresh(){return{tab:'adv',char:null,adv:null,dice:{hist:[],count:1,mod:0,mode:'norm',last:null},chaos:5,like:2,journal:'',olast:null,draft:{cls:'fighter',name:''}};}
-let S;try{S=JSON.parse(localStorage.getItem(KEY))||fresh();}catch(e){S=fresh();}
-S=Object.assign(fresh(),S);
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
-const C=()=>S.char?CLASSES[S.char.cls]:null;
-function skillBonus(sk){const c=C();return mod(c.abil[SKILL[sk]])+(c.prof.includes(sk)?2:0);}
-function makeChar(id,name){const c=CLASSES[id];const uses={};c.feats.forEach(f=>{if(f.max)uses[f.id]=f.max;});return{cls:id,name:name||c.name,hp:c.hp,maxhp:c.hp,ac:c.ac,slots:c.slots,maxSlots:c.slots,uses,potions:3,gold:20,items:[...c.gear]};}
-
-/* ================= 오버레이 ================= */
-function modal(html,btns){const o=$('#overlay');o.innerHTML=`<div class="card">${html}<div class="row" style="justify-content:center;margin-top:16px">${btns.map((b,i)=>`<button class="btn ${b.cls||''}" data-mb="${i}">${b.t}</button>`).join('')}</div></div>`;o.classList.add('show');o.onclick=e=>{const b=e.target.closest('[data-mb]');if(!b)return;o.classList.remove('show');o.onclick=null;btns[+b.dataset.mb].fn&&btns[+b.dataset.mb].fn();};}
-
-/* ================= 모험 엔진 ================= */
-function fxApply(fx){const A=S.adv,c=S.char;const out=[];
- if(fx.set)Object.assign(A.flags,fx.set);
- if(fx.gold){const g=fx.gold<0?Math.max(fx.gold,-c.gold):fx.gold;if(g){c.gold+=g;out.push(`💰 은화 ${sgn(g)}`);}}
- if(fx.potions){c.potions+=fx.potions;out.push(`🧪 치유 물약 +${fx.potions}`);}
- if(fx.item&&!c.items.includes(fx.item)){c.items.push(fx.item);out.push(`🎒 '${fx.item}' 획득`);}
- if(fx.dmg){const r=roll(fx.dmg);c.hp=Math.max(0,c.hp-r.t);out.push(`💥 피해 ${r.t} (${fx.dmg})`);}
- if(fx.rest)out.push(doRest(false));
- A.fx.push(...out);}
-function doRest(full){const c=S.char,k=C();const before=c.hp;
- if(full){c.hp=c.maxhp;c.slots=c.maxSlots;}else{c.hp=Math.min(c.maxhp,c.hp+Math.ceil(c.maxhp/2));c.slots=Math.min(c.maxSlots,c.slots+2);}
- k.feats.forEach(f=>{if(f.max)c.uses[f.id]=f.max;});
- return `😮‍💨 휴식: HP +${c.hp-before}${k.slots?`, 주문 슬롯 ${c.slots}/${c.maxSlots}`:''}, 특수 능력 회복`;}
-function startAdv(){const c=S.char,k=C();c.hp=c.maxhp;c.slots=c.maxSlots;k.feats.forEach(f=>{if(f.max)c.uses[f.id]=f.max;});
- c.items=c.items.filter(i=>!['소금 창고 3번 열쇠','토마스의 일지','붉은 신호탄','밀수 장부'].includes(i));
- S.adv={node:'start',flags:{},fx:[],cp:null,combat:null,ended:null};enterNode('start');}
-function enterNode(id){const A=S.adv,n=NODES[id];A.node=id;A.combat=null;A.fx=[];A.ended=null;
- A.cp=JSON.parse(JSON.stringify({char:S.char,flags:A.flags}));
- if(n.onEnter&&!A.flags['_v_'+id])fxApply(n.onEnter);
- A.flags['_v_'+id]=1;
- if(n.combat)A.combat=setupCombat(n.combat);
- if(n.ending)A.ended=n.ending;
- save();render();window.scrollTo(0,0);
- if(S.char.hp<=0)death();}
-function visible(n){const f=S.adv.flags;return(n.choices||[]).map((c,i)=>({c,i})).filter(({c})=>(!c.req||c.req.every(x=>f[x]))&&(!c.not||!c.not.some(x=>f[x])));}
-function dcOf(ch){return typeof ch.dc==='function'?ch.dc(S.adv.flags):ch.dc;}
-function choose(i){const A=S.adv,n=NODES[A.node],ch=n.choices[i];if(S.char.hp<=0)return death();
- if(ch.gold<0&&S.char.gold<-ch.gold)return;
- const pre={set:ch.set,gold:ch.gold,rest:ch.rest};A.fx=[];
- if(ch.check){fxApply(pre);const k=ch.check,dc=dcOf(k),b=skillBonus(k.skill),r=rnd(20),tot=r+b;
-  const ok=r===20||(r!==1&&tot>=dc);
-  save();
-  modal(`<div class="scene-title">${ABIL[SKILL[k.skill]]}(${k.skill}) 판정 · DC ${dc}</div>
-   <div class="big">${tot}</div><div class="muted">🎲 ${r} ${sgn(b)}${r===20?' · 대성공!':r===1?' · 대실패!':''}</div>
-   <h2 class="${ok?'ok-c':'bad-c'}" style="margin-top:10px">${ok?'성공':'실패'}</h2>`,[{t:'계속',fn:()=>{const keep=A.fx;enterNode(ok?k.ok:k.fail);if(keep.length){A.fx=keep.concat(A.fx);save();render();}}}]);
-  return;}
- const keep=[];if(pre.set||pre.gold||pre.rest){fxApply(pre);keep.push(...A.fx);}
- enterNode(ch.go);if(keep.length){A.fx=keep.concat(A.fx);save();render();}}
-
-/* ---- 전투 ---- */
-function setupCombat(cfg){return{enemies:cfg.enemies.map(e=>{const b=FOES[e.t];const hp=e.hp||b.hp;return Object.assign({},b,e,{hp,max:e.max||b.hp});}),ally:cfg.ally||null,win:cfg.win,round:1,log:[],target:0,potion:false,free:false,done:false};}
-function alive(){return S.adv.combat.enemies.filter(e=>e.hp>0);}
-function tgt(){const cb=S.adv.combat;if(cb.enemies[cb.target]&&cb.enemies[cb.target].hp>0)return cb.enemies[cb.target];const a=alive()[0];cb.target=cb.enemies.indexOf(a);return a;}
-function L(s,c){S.adv.combat.log.unshift(`<div class="${c||''}">${s}</div>`);}
-function hitDmg(e,dmg,src){e.hp=Math.max(0,e.hp-dmg);L(`${src} → <b>${esc(e.name)}</b>에게 ${dmg} 피해${e.hp<=0?' · <b>쓰러짐!</b>':''}`,'hit');}
-function weaponAttack(a,opts){opts=opts||{};const e=tgt();if(!e)return;const cb=S.adv.combat,k=C();
- const dr=d20(opts.adv?'adv':'norm');const crit=dr.v===20;const tot=dr.v+a.atk;
- if(dr.v!==1&&(crit||tot>=e.ac)){let r=roll(a.dmg,crit);let d=r.t,extra='';
-  if(k.sneak&&(opts.sneak||(a.sneakR1&&cb.round===1))){const s=roll(k.sneak,crit);d+=s.t;extra=` (급소 +${s.t})`;}
-  hitDmg(e,d,`${a.name} 🎲${dr.txt}${sgn(a.atk)}=${tot}${crit?' 치명타!':''}${extra}`);}
- else L(`${a.name} 🎲${dr.txt}${sgn(a.atk)}=${tot} → ${esc(e.name)}(AC ${e.ac}) 빗나감`);}
-function act(kind,id){const cb=S.adv.combat,c=S.char,k=C();if(!cb||cb.done||c.hp<=0)return;
- if(kind==='potion'){if(cb.potion||c.potions<1)return;c.potions--;cb.potion=true;const r=roll('2d4+2');const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+r.t);L(`🧪 치유 물약 → HP +${c.hp-b}`,'ok');save();render();return;}
- let a=[...k.attacks,...k.feats].find(x=>x.id===id);if(!a)return;
- if(a.free){if(cb.free||!c.uses[a.id])return;c.uses[a.id]--;cb.free=true;const r=roll(a.heal);const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+r.t);L(`${a.name} → HP +${c.hp-b}`,'ok');save();render();return;}
- if(a.slot){if(c.slots<a.slot)return;c.slots-=a.slot;}
- if(a.max){if(!c.uses[a.id])return;c.uses[a.id]--;}
- if(a.type==='attack')weaponAttack(a);
- else if(a.type==='hide'){const r=rnd(20),b=skillBonus('은신');if(r+b>=a.dc){L(`그림자 속으로 숨는다 (은신 ${r}${sgn(b)}=${r+b}) ✔`,'ok');weaponAttack(a,{adv:true,sneak:true});}else{L(`숨기 실패 (은신 ${r}${sgn(b)}=${r+b}) — 그냥 찌른다`);weaponAttack(a);}}
- else if(a.type==='multi'){L(`<b>${a.name}!</b>`,'ok');for(let i=0;i<a.count;i++)if(alive().length)weaponAttack(k.attacks[0]);}
- else if(a.type==='auto'){const e=tgt();hitDmg(e,roll(a.dmg).t,`✨ ${a.name}`);}
- else if(a.type==='aoe'){alive().forEach(e=>{const s=rnd(20)+e.save;let d=roll(a.dmg).t;if(s>=a.dc)d=Math.floor(d/2);hitDmg(e,d,`💨 ${a.name}${s>=a.dc?' (내성 성공, 절반)':''}`);});}
- else if(a.type==='save'){const e=tgt();const s=rnd(20)+e.save;if(s>=a.dc)L(`${a.name} → ${esc(e.name)} 피함 (내성 ${s})`);else hitDmg(e,roll(a.dmg).t,`🔥 ${a.name}`);}
- else if(a.type==='heal'){const r=roll(a.heal);const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+r.t);L(`${a.name} → HP +${c.hp-b}`,'ok');}
- endTurn();}
-function endTurn(){const cb=S.adv.combat,c=S.char;
- if(cb.ally&&alive().length){const e=alive()[0];const r=rnd(20);if(r+cb.ally.atk>=e.ac)hitDmg(e,roll(cb.ally.dmg,r===20).t,`🤝 ${cb.ally.name}`);else L(`🤝 ${cb.ally.name}의 공격이 빗나감`);}
- if(!alive().length){cb.done=true;const b=c.hp;c.hp=Math.min(c.maxhp,c.hp+Math.ceil(c.maxhp/4));L(`🏆 <b>승리!</b> 숨을 고른다 (HP +${c.hp-b})`,'ok');save();render();return;}
- alive().forEach(e=>{if(c.hp<=0)return;const r=rnd(20),tot=r+e.atk;if(r!==1&&(r===20||tot>=c.ac)){const d=roll(e.dmg,r===20).t;c.hp=Math.max(0,c.hp-d);L(`${esc(e.name)}의 공격 🎲${r}${sgn(e.atk)}=${tot}${r===20?' 치명타!':''} → 당신에게 ${d} 피해`,'hurt');}else L(`${esc(e.name)}의 공격 🎲${r}${sgn(e.atk)}=${tot} → 막아냈다 (AC ${c.ac})`);});
- cb.round++;cb.potion=false;cb.free=false;save();render();
- if(c.hp<=0)death();}
-function death(){modal(`<div style="font-size:48px">💀</div><h2 class="bad-c">쓰러졌다…</h2><p class="muted">눈앞이 캄캄해진다. 이야기는 여기서 끝나지 않는다. 이 장면이 시작된 순간으로 돌아갈 수 있다.</p>`,
- [{t:'이 장면 다시',fn:()=>{const A=S.adv;S.char=A.cp.char;A.flags=A.cp.flags;enterNode(A.node);}},{t:'처음부터',cls:'ghost',fn:startAdv}]);}
-
 /* ================= 렌더링 ================= */
-function paras(t){return t.split(/\n\s*\n/).map(p=>`<p>${p.replace(/\n/g,'<br>')}</p>`).join('');}
-function statbar(){const c=S.char;if(!c)return'';const k=C();
+function paras(t){return t.trim().split(/\n\s*\n/).map(p=>`<p>${p.replace(/\n/g,'<br>')}</p>`).join('');}
+function statbar(){const c=S.char;if(!c||S.menu&&S.tab==='adv')return'';const k=K();
  return`<div class="hpbar"><i style="width:${Math.round(c.hp/c.maxhp*100)}%"></i><span>❤️ ${c.hp} / ${c.maxhp}</span></div>
- <span class="chip">🛡️ ${c.ac}</span>${k.slots?`<span class="chip">✨ ${c.slots}/${c.maxSlots}</span>`:''}<span class="chip">🧪 ${c.potions}</span><span class="chip">💰 ${c.gold}</span>`;}
-function vAdv(){const c=S.char;
- if(!c)return`<div class="card"><h2>발더스 게이트: 얼굴 없는 밀수꾼</h2><p class="muted">혼자 즐기는 텍스트 모험이에요. 먼저 캐릭터를 골라 주세요.</p><button class="btn" data-go-tab="char">캐릭터 만들기</button></div>`;
- const A=S.adv;
- if(!A)return`<div class="card"><div class="scene-title">솔로 어드벤처 · 약 40–60분</div><h2>발더스 게이트: 얼굴 없는 밀수꾼</h2>
-  <p>소드 코스트 최대의 항구 도시. 오랜 친구가 보낸 다급한 편지 한 통을 들고 당신은 이 도시에 도착한다. 사람이 사라지고, 사라진 사람이 다음 날 멀쩡히 돌아오는 도시에.</p>
-  <p class="muted">선택지를 눌러 진행하세요. 판정과 전투 주사위는 자동으로 굴러가요. 쓰러져도 그 장면부터 다시 할 수 있어요. 진행 상황은 기기에 자동 저장돼요.</p>
-  <button class="btn" data-a="start">${CLASSES[c.cls].icon} ${esc(c.name)}(으)로 모험 시작</button></div>`;
- const n=NODES[A.node];const text=typeof n.text==='function'?n.text(A.flags):n.text;
- let h=`<div class="card"><div class="scene-title">${esc(n.title||'')}</div>${A.fx.length?`<div class="fx">${A.fx.join('<br>')}</div>`:''}<div class="story">${paras(text)}</div>`;
- if(A.combat)h+=vCombat();
- else if(A.ended)h+=`<hr><div class="row"><button class="btn" data-a="restart">새로 시작</button><button class="btn ghost" data-go-tab="oracle">자유 모험 이어가기 (오라클)</button></div>`;
- else h+=`<div class="choices">${visible(n).map(({c:ch,i})=>{const dis=ch.gold<0&&S.char.gold<-ch.gold;let tag='';
-   if(ch.check){const k=ch.check;tag=`<span class="tag">${ABIL[SKILL[k.skill]]}(${k.skill}) DC ${dcOf(k)} · ${sgn(skillBonus(k.skill))}</span>`;}
-   if(ch.gold<0)tag+=`<span class="tag">은화 ${-ch.gold}</span>`;if(ch.sub)tag+=`<span class="tag">${ch.sub}</span>`;
-   return`<button class="choice" data-ch="${i}" ${dis?'disabled':''}>${esc(ch.t)}<br>${tag}</button>`;}).join('')}</div>`;
+ <span class="chip">Lv ${c.level}</span><span class="chip">🛡️ ${c.ac}</span>${k.maxSlots?`<span class="chip">✨ ${c.slots}/${c.maxSlots}</span>`:''}<span class="chip">🧪 ${c.potions}</span><span class="chip">💰 ${c.gold}</span>`;}
+function vMenu(){
+ if(!S.hero)return`<div class="card"><h2>환영해요, 모험가!</h2><p class="muted">먼저 캐릭터를 골라 주세요. 모든 모험에서 같은 캐릭터를 쓰고, 레벨은 모험마다 정해진 대로 시작해요.</p><button class="btn" data-go-tab="char">캐릭터 만들기</button></div>`;
+ const cur=S.adv&&S.adv.camp;
+ return`<div class="card"><h2>모험 고르기</h2><p class="muted" style="margin:0">${CLASSES[S.hero.cls].icon} ${esc(S.hero.name)} · 모험마다 진행 상황이 따로 저장돼요.</p></div>`+
+ CAMPS.map(cp=>{const sv=cur===cp.id?{adv:S.adv}:S.saves[cp.id];const ch=sv?sv.adv.chapter:-1;
+  return`<div class="card camp"><div class="scene-title">${esc(cp.sub)}${S.done[cp.id]?' · ✅ 완료':''}</div><h2>${esc(cp.title)}</h2><p class="muted">${esc(cp.desc)}</p>
+  <div>${cp.chapters.map((c,i)=>{const reached=sv&&sv.adv.chSnap[i];return`<div class="chap ${reached?'':'lock'}"><span>${i+1}장. ${esc(c.title)} <span class="muted" style="font-size:12px">Lv ${cp.startLevel+i}</span></span>${reached?`<button class="btn ghost sm" data-rch="${cp.id}:${i}">${i===ch?'이 장 다시':'다시 하기'}</button>`:'<span>🔒</span>'}</div>`;}).join('')}</div>
+  <div class="row" style="margin-top:12px">${sv?`<button class="btn" data-resume="${cp.id}">▶ 이어하기 (${ch+1}장)</button><button class="btn ghost" data-newc="${cp.id}">처음부터</button>`:`<button class="btn" data-newc="${cp.id}">▶ 시작하기</button>`}</div></div>`;}).join('');}
+function vAdv(){if(S.menu||!S.adv)return vMenu();
+ const A=S.adv,cp=camp(A.camp),n=NODES[A.node];const text=typeof n.text==='function'?n.text(A.flags):n.text;
+ let h=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="btn ghost sm" data-a="menu">← 모험 목록</button><span class="muted" style="font-size:13px">${esc(cp.short||cp.title)} · ${A.chapter+1}장</span></div>`;
+ h+=`<div class="party">${!A.combat?`<button class="btn ghost sm" data-a="bag">🎒 가방</button>`:''}`;
+ if(A.roster.length)h+=`${A.party.map(id=>`<span class="chip">🤝 ${esc(cp.comps[id].name)}</span>`).join('')}${A.party.length?'':'<span class="muted" style="font-size:13px">함께 싸우는 동료 없음</span>'}${!A.combat?`<button class="btn ghost sm" data-a="party">동료 편성${A.roster.length>A.party.length?` (+${A.roster.length-A.party.length})`:''}</button>`:''}`;
  h+=`</div>`;
- if(!A.combat)h+=`<div class="row" style="justify-content:flex-end"><button class="btn ghost sm" data-a="restart">처음부터 다시</button></div>`;
- return h;}
-function vCombat(){const cb=S.adv.combat,c=S.char,k=C();
- let h=`<hr><div class="scene-title">⚔️ 전투 · ${cb.round}라운드${cb.ally?` · 동료: ${esc(cb.ally.name)}`:''}</div>`;
+ h+=`<div class="card"><div class="scene-title">${esc(n.title||'')}</div>${A.fx.length?`<div class="fx">${A.fx.join('<br>')}</div>`:''}<div class="story">${paras(text)}</div>`;
+ if(n.shop&&!A.combat)h+=`</div>${vShop(n.shop)}<div class="card">`;
+ if(A.combat)h+=vCombat();
+ else if(n.chapterEnd)h+=`<hr><div style="text-align:center"><div class="scene-title">— ${A.chapter+1}장 완료 —</div><button class="btn" style="margin-top:8px" data-a="nextch">레벨 업하고 ${A.chapter+2}장으로 →</button></div>`;
+ else if(A.ended)h+=`<hr><div class="row"><button class="btn" data-a="menu">모험 목록으로</button><button class="btn ghost" data-go-tab="oracle">자유 모험 이어가기</button></div>`;
+ else h+=`<div class="choices">${visible(n).map(({c:ch,i})=>{const dis=ch.gold<0&&S.char.gold<-ch.gold;let tag='';
+   if(ch.check){const k=ch.check;tag+=`<span class="tag">${ABIL[SKILL[k.skill]]}(${k.skill}) DC ${dcOf(k)} · ${sgn(skillBonus(k.skill))}</span> `;}
+   if(ch.gold<0)tag+=`<span class="tag">금화 ${-ch.gold}</span> `;if(ch.sub)tag+=`<span class="tag">${ch.sub}</span>`;
+   return`<button class="choice" data-ch="${i}" ${dis?'disabled':''}>${esc(ch.t)}${tag?'<br>'+tag:''}</button>`;}).join('')}</div>`;
+ h+=`</div>`;return h;}
+function vCombat(){const cb=S.adv.combat,c=S.char,k=K();
+ let h=`<hr><div class="scene-title">⚔️ 전투 · ${cb.round}라운드</div>`;
  h+=cb.enemies.map((e,i)=>`<button class="enemy ${e.hp<=0?'dead':''} ${i===cb.target&&e.hp>0&&!cb.done?'tg':''}" data-tg="${i}"><span class="nm"><b>${esc(e.name)}</b> <span class="muted">AC ${e.ac}</span><div class="bar"><i style="width:${Math.round(e.hp/e.max*100)}%"></i></div></span><span>${e.hp}/${e.max}</span></button>`).join('');
+ if(cb.allies.length)h+=`<div style="margin:8px 0 10px">${cb.allies.map(a=>`<div class="ally ${a.hp<=0?'down':''}">🤝 <b>${esc(a.name)}</b><span class="bar"><i style="width:${Math.round(a.hp/a.max*100)}%"></i></span><span>${a.hp>0?a.hp+'/'+a.max:'쓰러짐'}</span></div>`).join('')}</div>`;
  if(cb.done)h+=`<button class="btn" style="width:100%;margin-top:8px" data-a="won">승리! 계속하기 →</button>`;
  else{if(alive().length>1)h+=`<div class="muted" style="margin:-2px 0 8px">적을 눌러 목표를 바꿀 수 있어요.</div>`;
   h+=`<div class="grid2">`;
   k.attacks.forEach(a=>{h+=`<button class="act" data-act="${a.id}"><b>${a.name}</b><small>${a.desc}</small></button>`;});
   k.feats.forEach(a=>{const off=a.slot?c.slots<a.slot:a.max?!c.uses[a.id]:false;const offFree=a.free&&cb.free;
    h+=`<button class="act ${a.free?'free':''}" data-act="${a.id}" ${off||offFree?'disabled':''}><b>${a.name}${a.max?` (${c.uses[a.id]||0})`:''}</b><small>${a.desc}</small></button>`;});
-  h+=`<button class="act free" data-act="potion" ${cb.potion||c.potions<1?'disabled':''}><b>🧪 치유 물약 (${c.potions})</b><small>추가 행동 · HP 2d4+2 (턴마다 1회)</small></button></div>`;}
+  h+=`<button class="act free" data-act="potion" ${cb.potion||c.potions<1?'disabled':''}><b>🧪 치유 물약 (${c.potions})</b><small>추가 행동 · HP 회복 (턴마다 1회)</small></button>`;
+  const nUse=Object.entries(inv(c).bag).filter(([id,n])=>n>0&&ITEMS[id]&&ITEMS[id].use).reduce((a,[,n])=>a+n,0);
+  h+=`<button class="act" data-a="cbag" ${nUse?'':'disabled'}><b>🎒 아이템 (${nUse})</b><small>폭탄·물약·두루마리 사용</small></button></div>`;}
  h+=`<div class="log">${cb.log.slice(0,40).join('')||'<div class="muted">당신의 차례입니다.</div>'}</div>`;
  return h;}
-function vChar(){const c=S.char;
- if(!c){const d=S.draft;return`<div class="card"><h2>캐릭터 고르기</h2><p class="muted">3레벨 모험가로 시작해요. 처음이라면 파이터를 추천해요.</p>
-  <div class="grid2">${Object.entries(CLASSES).map(([id,k])=>`<button class="cls ${d.cls===id?'on':''}" data-cls="${id}"><b>${k.icon} ${k.name}</b><small>난이도 ${k.diff} · HP ${k.hp} · AC ${k.ac}</small><small>${k.blurb}</small></button>`).join('')}</div>
+function vChar(){
+ if(!S.hero){const d=S.draft;return`<div class="card"><h2>캐릭터 고르기</h2><p class="muted">처음이라면 파이터를 추천해요. 모험을 진행하면 레벨이 올라 새 능력이 생겨요.</p>
+  <div class="grid2">${Object.entries(CLASSES).map(([id,k])=>`<button class="cls ${d.cls===id?'on':''}" data-cls="${id}"><b>${k.icon} ${k.name}</b><small>난이도 ${k.diff} · 3레벨 HP ${k.hp0}</small><small>${k.blurb}</small></button>`).join('')}</div>
   <p><input id="cname" placeholder="이름 (비워두면 직업 이름)" value="${esc(d.name)}" maxlength="20"></p>
   <button class="btn" style="width:100%" data-a="mkchar">이 캐릭터로 결정</button></div>`;}
- const k=C();
- return`<div class="card"><div class="row" style="justify-content:space-between"><div><h2>${k.icon} ${esc(c.name)}</h2><div class="muted">3레벨 ${k.name} · 숙련 보너스 +2</div></div></div>
+ const c=S.char&&!S.menu?S.char:(S.char||makeChar(S.hero.cls,S.hero.name,3));const live=!!S.char;const k=live?applyGear(kit(c.cls,c.level),inv(c)):kit(c.cls,c.level),cl=CLASSES[c.cls];
+ return`<div class="card"><h2>${cl.icon} ${esc(c.name)}</h2><div class="muted">${c.level}레벨 ${cl.name} · 숙련 보너스 +${k.p}${live&&S.adv?` · ${esc(camp(S.adv.camp).short||'')}`:' · 미리보기'}</div>
   <hr><div class="grid3" style="grid-template-columns:repeat(6,1fr);gap:6px">${Object.entries(ABIL).map(([a,nm])=>`<div class="abil"><small>${nm}</small><b>${k.abil[a]}</b><span>${sgn(mod(k.abil[a]))}</span></div>`).join('')}</div></div>
- <div class="card"><h3>상태</h3>
-  <div class="list">
+ ${live?`<div class="card"><h3>상태</h3><div class="list">
    <li>❤️ HP <span class="stepper"><button data-adj="hp:-1">−</button><output>${c.hp}/${c.maxhp}</output><button data-adj="hp:1">+</button></span></li>
-   ${k.slots?`<li>✨ 주문 슬롯 <span class="stepper"><button data-adj="slots:-1">−</button><output>${c.slots}/${c.maxSlots}</output><button data-adj="slots:1">+</button></span></li>`:''}
+   ${k.maxSlots?`<li>✨ 주문 슬롯 <span class="stepper"><button data-adj="slots:-1">−</button><output>${c.slots}/${c.maxSlots}</output><button data-adj="slots:1">+</button></span></li>`:''}
    <li>🧪 치유 물약 <span class="stepper"><button data-adj="potions:-1">−</button><output>${c.potions}</output><button data-adj="potions:1">+</button></span></li>
-   <li>💰 은화 <span class="stepper"><button data-adj="gold:-1">−</button><output>${c.gold}</output><button data-adj="gold:1">+</button></span></li>
-  </div>
-  <div class="row" style="margin-top:12px"><button class="btn ghost sm" data-a="srest">짧은 휴식</button><button class="btn ghost sm" data-a="lrest">긴 휴식 (완전 회복)</button></div></div>
- <div class="card"><h3>공격과 능력</h3><ul class="list">${[...k.attacks,...k.feats].map(a=>`<li><span><b>${a.name}</b><br><span class="muted">${a.desc}</span></span>${a.max?`<span class="chip">${c.uses[a.id]||0}/${a.max}</span>`:''}</li>`).join('')}</ul></div>
- <div class="card"><h3>기술 (★ 숙련)</h3><div class="skills">${Object.keys(SKILL).map(s=>`<div class="${k.prof.includes(s)?'p':''}"><span>${k.prof.includes(s)?'★ ':''}${s} <small class="muted">${ABIL[SKILL[s]]}</small></span><span>${sgn(skillBonus(s))}</span></div>`).join('')}</div></div>
- <div class="card"><h3>소지품</h3><ul class="list">${c.items.map((it,i)=>`<li><span>${esc(it)}</span><button class="btn ghost sm" data-delitem="${i}">버리기</button></li>`).join('')}</ul>
-  <div class="row" style="margin-top:10px;flex-wrap:nowrap"><input id="newitem" placeholder="아이템 추가"><button class="btn sm" data-a="additem">추가</button></div></div>
+   <li>💰 금화 <span class="stepper"><button data-adj="gold:-1">−</button><output>${c.gold}</output><button data-adj="gold:1">+</button></span></li></div>
+  <div class="row" style="margin-top:12px"><button class="btn ghost sm" data-a="srest">짧은 휴식</button><button class="btn ghost sm" data-a="lrest">긴 휴식 (완전 회복)</button></div>
+  <p class="muted" style="font-size:12px;margin-bottom:0">모험 중에 직접 휴식을 누르면 난이도가 쉬워져요. 자유 모험할 때 쓰세요.</p></div>`:''}
+ <div class="card"><h3>공격과 능력</h3><ul class="list">${[...k.attacks,...k.feats].map(a=>`<li><span><b>${a.name}</b><br><span class="muted">${a.desc}</span></span>${a.max&&live?`<span class="chip">${c.uses[a.id]||0}/${a.max}</span>`:''}</li>`).join('')}${k.passive.map(p=>`<li><span><b>${p[0]}</b><br><span class="muted">${p[1]}</span></span><span class="chip">상시</span></li>`).join('')}</ul></div>
+ <div class="card"><h3>기술 (★ 숙련)</h3><div class="skills">${Object.keys(SKILL).map(s=>`<div class="${k.prof.includes(s)?'p':''}"><span>${k.prof.includes(s)?'★ ':''}${s} <small class="muted">${ABIL[SKILL[s]]}</small></span><span>${sgn(skillBonus(s,c))}</span></div>`).join('')}</div></div>
+ ${live?`<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">장비</h3><button class="btn sm" data-a="bag">🎒 가방 열기</button></div><ul class="list" style="margin-top:8px">${Object.keys(SLOTN).map(sl=>{const id=inv(c).eq[sl];return`<li><span><span class="muted" style="font-size:12px">${SLOTN[sl]}</span><br>${id?`<b>${esc(ITEMS[id].name)}</b> <small class="muted">${esc(ITEMS[id].desc)}</small>`:'<span class="muted">비어 있음</span>'}</span></li>`;}).join('')}</ul></div>
+ <div class="card"><h3>중요 물품</h3><ul class="list">${c.items.map((it,i)=>`<li><span>${esc(it)}</span><button class="btn ghost sm" data-delitem="${i}">버리기</button></li>`).join('')}</ul>
+  <div class="row" style="margin-top:10px;flex-wrap:nowrap"><input id="newitem" placeholder="아이템 추가"><button class="btn sm" data-a="additem">추가</button></div></div>`:''}
  <div class="card"><h3>관리</h3><div class="row"><button class="btn ghost sm" data-a="newchar">캐릭터 바꾸기</button><button class="btn ghost sm" data-a="backup">백업 내보내기</button><button class="btn ghost sm" data-a="restore">백업 불러오기</button><button class="btn red sm" data-a="wipe">전체 초기화</button></div></div>`;}
 function vDice(){const D=S.dice;const l=D.last;
  return`<div class="card"><h2>주사위</h2>
@@ -565,7 +1675,7 @@ function vDice(){const D=S.dice;const l=D.last;
   <div class="grid2" style="margin-top:14px"><div><div class="muted">개수</div><span class="stepper"><button data-dadj="count:-1">−</button><output>${D.count}</output><button data-dadj="count:1">+</button></span></div>
    <div><div class="muted">보정치</div><span class="stepper"><button data-dadj="mod:-1">−</button><output>${sgn(D.mod)}</output><button data-dadj="mod:1">+</button></span></div></div>
   <div class="muted" style="margin-top:12px">d20 굴림 방식</div><div class="seg">${[['norm','일반'],['adv','이점'],['dis','불리']].map(([m,t])=>`<button class="${D.mode===m?'on':''}" data-dmode="${m}">${t}</button>`).join('')}</div></div>
-  ${S.char?`<div class="card"><h3>내 캐릭터로 기술 판정</h3><div class="grid3">${Object.keys(SKILL).map(s=>`<button class="btn ghost sm" data-sk="${s}">${s} ${sgn(skillBonus(s))}</button>`).join('')}</div></div>`:''}
+  ${S.hero?`<div class="card"><h3>내 캐릭터로 기술 판정</h3><div class="grid3">${Object.keys(SKILL).map(s=>`<button class="btn ghost sm" data-sk="${s}">${s} ${sgn(skillBonus(s))}</button>`).join('')}</div></div>`:''}
   <div class="card"><h3>최근 기록</h3><ul class="list">${D.hist.map(h=>`<li><span class="muted">${esc(h.desc)}</span><b>${h.total}</b></li>`).join('')||'<li class="muted">아직 없어요</li>'}</ul></div>`;}
 function vOracle(){const o=S.olast;
  return`<div class="card"><h2>예/아니오 오라클</h2><p class="muted">GM 없이 혼자 할 때, 궁금한 걸 질문하고 굴리세요. "문이 잠겨 있나?" "경비병이 깨어 있나?"</p>
@@ -583,20 +1693,19 @@ function vOracle(){const o=S.olast;
   <button class="btn ghost" data-gen="enc:던전" style="grid-column:span 2">🕳️ 던전 조우</button></div></div>
  <div class="card"><h3>혼자 하는 법</h3><p class="muted" style="margin:0">1) 장면을 정하고 '장면 체크'로 예상대로 흘러가는지 확인 → 2) 궁금한 건 오라클에 질문 → 3) 막히면 '영감'이나 '무작위 사건' → 4) 결과를 '기록'에 남기기. 전투는 주사위 탭에서 굴리세요.</p></div>`;}
 function vJournal(){return`<div class="card"><h2>모험 기록장</h2><p class="muted">자동 저장돼요. 오라클 결과를 여기로 보낼 수 있어요.</p><textarea id="jr" rows="18" placeholder="오늘의 모험…">${esc(S.journal)}</textarea></div>`;}
-
-function render(){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
- $('#statbar').innerHTML=statbar();
- $('#view').innerHTML=(installHint())+({adv:vAdv,char:vChar,dice:vDice,oracle:vOracle,journal:vJournal}[S.tab])();}
 function installHint(){const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);if(!ios||navigator.standalone||S.hintOff)return'';
  return`<div class="banner">📲 오프라인으로 쓰려면 Safari 아래쪽 <b>공유 버튼 → 홈 화면에 추가</b>를 누르고, 홈 화면 아이콘으로 실행하세요. <button class="btn ghost sm" data-a="hintoff" style="margin-top:6px">닫기</button></div>`;}
+function render(){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+ $('#statbar').innerHTML=statbar();
+ $('#view').innerHTML=installHint()+({adv:vAdv,char:vChar,dice:vDice,oracle:vOracle,journal:vJournal}[S.tab])();}
 
 /* ================= 오라클 로직 ================= */
 function plainOracle(){return(S.olast||'').replace(/<br>/g,'\n').replace(/<[^>]+>/g,'');}
+function evt(){const r=rnd(100);const f=T.focus.find(x=>r<=x[0])[1];return`${f} — <i>${pick(T.action)} / ${pick(T.subject)}</i>`;}
 function ask(){const th=LIKE[S.like][1],r=rnd(100);const q=($('#oq')||{}).value||'';let a,cls;
  if(r<=Math.ceil(th/5)){a='예, 그리고 더!';cls='ok-c';}else if(r<=th){a='예';cls='ok-c';}else if(r>100-Math.ceil((100-th)/5)){a='아니오, 오히려 반대로!';cls='bad-c';}else{a='아니오';cls='bad-c';}
- let ev='';const t=r%10,tens=Math.floor(r/10)%10;if(r<100&&r>10&&t===tens&&t<=S.chaos)ev=`<br><b>⚡ 무작위 사건!</b> ${evt()}`;
+ let ev='';const t=r%10,tens=fl(r/10)%10;if(r<100&&r>10&&t===tens&&t<=S.chaos)ev=`<br><b>⚡ 무작위 사건!</b> ${evt()}`;
  S.olast=`${q?`<div class="muted">Q. ${esc(q)}</div>`:''}<span class="k ${cls}">${a}</span> <span class="muted">(🎲${r} / ${LIKE[S.like][0]})</span>${ev}`;save();render();}
-function evt(){const r=rnd(100);const f=T.focus.find(x=>r<=x[0])[1];return`${f} — <i>${pick(T.action)} / ${pick(T.subject)}</i>`;}
 function gen(g){let h;
  if(g==='scene'){const r=rnd(10);h=r>S.chaos?'<span class="k">예상대로 진행</span><br>생각한 장면 그대로 시작하세요.':r%2?'<span class="k">변경된 장면</span><br>예상과 조금 다르게 흘러가요. 한 가지 요소를 바꾸세요.':`<span class="k">중단된 장면</span><br>전혀 다른 일이 끼어듭니다: ${evt()}`;h+=` <span class="muted">(🎲${r} vs 혼돈 ${S.chaos})</span>`;}
  else if(g==='event')h=`<span class="k">⚡ 무작위 사건</span><br>${evt()}`;
@@ -608,13 +1717,16 @@ function gen(g){let h;
  S.olast=h;save();render();}
 
 /* ================= 이벤트 ================= */
-document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const ds=t.dataset;
+document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t||t.closest('#overlay'))return;const ds=t.dataset;
  if(ds.tab){S.tab=ds.tab;save();render();window.scrollTo(0,0);return;}
  if(ds.goTab){S.tab=ds.goTab;save();render();return;}
  if(ds.ch!==undefined)return choose(+ds.ch);
  if(ds.act)return act(ds.act==='potion'?'potion':'x',ds.act);
  if(ds.tg!==undefined){const cb=S.adv.combat;if(cb.enemies[+ds.tg].hp>0){cb.target=+ds.tg;save();render();}return;}
  if(ds.cls){S.draft.cls=ds.cls;S.draft.name=($('#cname')||{}).value||'';save();render();return;}
+ if(ds.newc){const id=ds.newc;const has=S.saves[id]||(S.adv&&S.adv.camp===id);if(has)modal('<h2>처음부터 시작할까요?</h2><p class="muted">이 모험의 진행 상황이 사라져요.</p>',[{t:'처음부터',fn:()=>{if(S.adv&&S.adv.camp===id)S.adv=null;delete S.saves[id];startCamp(id);}},{t:'취소',cls:'ghost'}]);else startCamp(id);return;}
+ if(ds.resume)return resumeCamp(ds.resume);
+ if(ds.rch){const[id,ch]=ds.rch.split(':');modal(`<h2>${+ch+1}장을 다시 할까요?</h2><p class="muted">그 장을 시작했던 때의 상태로 돌아가요. 이후 진행은 사라져요.</p>`,[{t:'다시 하기',fn:()=>restartChapter(id,+ch)},{t:'취소',cls:'ghost'}]);return;}
  if(ds.adj){const[k,v]=ds.adj.split(':');const c=S.char;c[k]=Math.max(0,c[k]+ +v);if(k==='hp')c.hp=Math.min(c.hp,c.maxhp);if(k==='slots')c.slots=Math.min(c.slots,c.maxSlots);save();render();return;}
  if(ds.delitem!==undefined){S.char.items.splice(+ds.delitem,1);save();render();return;}
  if(ds.die){const D=S.dice,s=+ds.die;let total,desc;
@@ -627,28 +1739,32 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
  if(ds.like!==undefined){S.like=+ds.like;save();render();return;}
  if(ds.chaos){S.chaos=Math.max(1,Math.min(9,S.chaos+ +ds.chaos));save();render();return;}
  if(ds.gen)return gen(ds.gen);
+ if(ds.buy)return buy(ds.buy);
+ if(ds.sell)return sell(ds.sell);
  const a=ds.a;if(!a)return;
- ({start:startAdv,
-  restart:()=>modal('<h2>처음부터 다시 할까요?</h2><p class="muted">HP와 능력이 모두 회복되고 이야기가 처음으로 돌아가요.</p>',[{t:'다시 시작',fn:startAdv},{t:'취소',cls:'ghost'}]),
+ ({menu:()=>{S.menu=true;save();render();window.scrollTo(0,0);},
+  party:partyModal,nextch:nextChapter,bag:()=>bagModal(),cbag:()=>bagModal('combat'),
   won:()=>enterNode(S.adv.combat.win),
-  mkchar:()=>{const nm=($('#cname').value||'').trim();S.char=makeChar(S.draft.cls,nm);S.adv=null;S.tab='adv';save();render();},
-  newchar:()=>modal('<h2>캐릭터를 바꿀까요?</h2><p class="muted">지금 캐릭터와 모험 진행이 사라져요.</p>',[{t:'바꾸기',cls:'red',fn:()=>{S.char=null;S.adv=null;save();render();}},{t:'취소',cls:'ghost'}]),
+  mkchar:()=>{const nm=($('#cname').value||'').trim();S.hero={cls:S.draft.cls,name:nm||CLASSES[S.draft.cls].name};S.char=null;S.adv=null;S.saves={};S.menu=true;S.tab='adv';save();render();},
+  newchar:()=>modal('<h2>캐릭터를 바꿀까요?</h2><p class="muted">모든 모험의 진행 상황이 사라져요.</p>',[{t:'바꾸기',cls:'red',fn:()=>{S.hero=null;S.char=null;S.adv=null;S.saves={};S.done={};S.menu=true;save();render();}},{t:'취소',cls:'ghost'}]),
   srest:()=>{const m=doRest(false);save();render();modal(`<p>${m}</p>`,[{t:'확인'}]);},
   lrest:()=>{const m=doRest(true);save();render();modal(`<p>${m}</p>`,[{t:'확인'}]);},
   additem:()=>{const v=$('#newitem').value.trim();if(v){S.char.items.push(v);save();render();}},
   clearhist:()=>{S.dice.hist=[];S.dice.last=null;save();render();},
-  ask, hintoff:()=>{S.hintOff=1;save();render();},
+  ask,hintoff:()=>{S.hintOff=1;save();render();},
   tojournal:()=>{const d=new Date();S.journal=(S.journal?S.journal.trimEnd()+'\n\n':'')+`[${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}] ${plainOracle()}`;save();modal('<p>기록장에 추가했어요.</p>',[{t:'확인'}]);},
   backup:()=>{const data=JSON.stringify(S);modal(`<h2>백업</h2><p class="muted">아래 내용을 전부 복사해 메모 앱에 붙여 두세요.</p><textarea rows="6" readonly onclick="this.select()">${esc(data)}</textarea>`,[{t:'닫기'}]);},
   restore:()=>{modal(`<h2>백업 불러오기</h2><textarea id="rs" rows="6" placeholder="백업 내용 붙여넣기"></textarea>`,[{t:'불러오기',fn:()=>{try{const v=JSON.parse(document.getElementById('rs').value);S=Object.assign(fresh(),v);save();render();}catch(e){modal('<p>형식이 올바르지 않아요.</p>',[{t:'확인'}]);}}},{t:'취소',cls:'ghost'}]);},
-  wipe:()=>modal('<h2>전부 지울까요?</h2><p class="muted">캐릭터, 모험, 기록장이 모두 삭제돼요.</p>',[{t:'모두 삭제',cls:'red',fn:()=>{S=fresh();save();render();}},{t:'취소',cls:'ghost'}])
+  wipe:()=>modal('<h2>전부 지울까요?</h2><p class="muted">캐릭터, 모든 모험, 기록장이 삭제돼요.</p>',[{t:'모두 삭제',cls:'red',fn:()=>{S=fresh();save();render();}},{t:'취소',cls:'ghost'}])
  }[a]||(()=>{}))();
 });
 let jt;document.addEventListener('input',e=>{if(e.target.id==='jr'){S.journal=e.target.value;clearTimeout(jt);jt=setTimeout(save,300);}if(e.target.id==='cname')S.draft.name=e.target.value;});
 function netState(){$('#offline').textContent=navigator.onLine?'':'✈︎ 오프라인';}
 addEventListener('online',netState);addEventListener('offline',netState);netState();
+if(S.adv&&!NODES[S.adv.node]){S.adv=null;S.menu=true;}
 render();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+
 </script>
 </body>
 </html>
