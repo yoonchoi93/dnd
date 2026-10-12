@@ -1,0 +1,16 @@
+{
+  "name": "기내 D&D",
+  "short_name": "기내 D&D",
+  "description": "비행기에서도 되는 오프라인 솔로 D&D",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#141118",
+  "theme_color": "#141118",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
